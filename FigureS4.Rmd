@@ -32,7 +32,7 @@ if (!dir.exists(knit_dir)) { dir.create(knit_dir, recursive = TRUE) }
 knit_Figure3 = paste0(knit_dir, "/Figure3.R")
 if (!file.exists(knit_Figure3)) {
     knitr::purl(
-    input = "Figure3.Rmd",
+    input = "Figure3_pt2.Rmd",
     output = knit_Figure3,
     documentation = 1
     )
