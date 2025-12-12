@@ -1,5 +1,5 @@
 ---
-title: "Figure 3C. Leveraging universal infant growth and maternal nutritional signals to identify putative growth-associated biomarkers of mammary gland dysfunction"
+title: "Figure 4C. Leveraging universal infant growth and maternal nutritional signals to identify putative growth-associated biomarkers of mammary gland dysfunction"
 ---
 
 ```{r setup, include=FALSE}
@@ -22,12 +22,12 @@ source("plotting_setup.R")
 source("plotting_functions.R")
 ```
 
-## Figure 3C 
+## Figure 4C 
 ``` {r}
 # Full set of features for the supplementary figure
 select_feats_full = c('Cit','Bio','K','Creatinine','Lys','LSTb','PA','B1','B2',
                  'HipAcid','C5','AABA','PC.ae.C34.0','LNnT','Se','FLNH',
-                 'TG.16.1_36.1.','TG.18.2_36.0.', "X6.SL", "Mn", "p.Cresol.SO4", 'B6', 'LNFP.III', 'g.tocopherol', 'X3.SL')
+                 'TG.16.1_36.1.','TG.18.2_36.0.', "X6.SL", 'B6', 'LNFP.III', 'g.tocopherol', 'X3.SL')
 # Selected features to highlight in main figure (see Figure S4 for full feature set)
 select_feats = c('C5', 'Se', 'X6.SL', 'Bio', 'PA', 'B2',  'AABA', 'LNnT') 
 
@@ -168,9 +168,9 @@ V_heatmap_unsupp = Vital_corr_nutrients_unsupp[unlist(nutrient_heatmap_key[selec
 )
 
 
-Figure3C = ggarrange(as.ggplot(M_heatmap_unsupp), as.ggplot(V_heatmap_unsupp), nrow = 1, widths = c(1,1.2))
-Figure3C
-ggexport(filename = paste0(fig_path, "/Figure3C.pdf"),
+Figure4C = ggarrange(as.ggplot(M_heatmap_unsupp), as.ggplot(V_heatmap_unsupp), nrow = 1, widths = c(1,1.2))
+Figure4C
+ggexport(filename = paste0(fig_path, "/Figure4C.pdf"),
          plot = Figure3C,
         width = 5.3, height = 4)
 ```

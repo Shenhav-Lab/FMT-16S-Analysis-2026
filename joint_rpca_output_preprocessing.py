@@ -26,29 +26,29 @@ def vital_meta_add_cols(vital_metadata):
     
     return vital_metadata
 
-def load_misame_raw_tables():
+def load_misame_raw_tables(dir_path='../output/all_tps'):
     
     tables_misame_all = {}
-    for table_ in glob.glob('../output/all_tps/*_raw.csv'):
+    for table_ in glob.glob(dir_path+'/*_raw.csv'):
         if any(x in table_ for x in ['vital','child','micro_all','metadata']):
             continue
         table_id = table_.split('_')[2]
         tables_misame_all[table_id] = pd.read_csv(table_, index_col=0)
     
-    tables_misame_all['untargeted_sapient'] = pd.read_csv('../output/all_tps/misame_untargeted_sapient.csv', index_col=0)
+    tables_misame_all['untargeted_sapient'] = pd.read_csv(dir_path+'/misame_untargeted_sapient.csv', index_col=0)
 
     return tables_misame_all
 
-def load_vital_raw_tables():
+def load_vital_raw_tables(dir_path='../output/all_tps'):
     
     tables_vital_all = {}
-    for table_ in glob.glob('../output/all_tps/*_raw.csv'):
+    for table_ in glob.glob(dir_path+'/*_raw.csv'):
         if any(x in table_ for x in ['misame','child','micro_all','metadata']):
             continue
         table_id = table_.split('_')[2]
         tables_vital_all[table_id] = pd.read_csv(table_, index_col=0)
     
-    tables_vital_all['untargeted_sapient'] = pd.read_csv('../output/all_tps/vital_untargeted_sapient.csv', index_col=0)
+    tables_vital_all['untargeted_sapient'] = pd.read_csv(dir_path+'/vital_untargeted_sapient.csv', index_col=0)
 
     return tables_vital_all
 
@@ -57,7 +57,7 @@ def get_shared_cohort_features(mod_list, misame_rankings, vital_rankings):
     shared_num = {}
     shared_denom = {}
 
-    for mod in mod_list.keys():
+    for mod in mod_list:
 
         mis_mod_ = misame_rankings[mod]
         vit_mod_ = vital_rankings[mod]
@@ -71,3 +71,5 @@ def get_shared_cohort_features(mod_list, misame_rankings, vital_rankings):
         mis_den_ = mis_mod_[mis_mod_['Log_Ratio_Annot']=='Denom'].index
         vit_den_ = vit_mod_[vit_mod_['Log_Ratio_Annot']=='Denom'].index
         shared_denom[mod] = list(set(mis_den_).intersection(vit_den_))
+
+    return shared_num, shared_denom

@@ -24,21 +24,21 @@ source("plotting_functions.R")
 
 # Supplementary Figure S4
 
-Requires objects from Figure 3C 
+Requires objects from Figure 4C 
 ``` {r}
-# Knitting Figure 3 document to load data
+# Knitting Figure 4 document to load data
 knit_dir = ".knitR"
 if (!dir.exists(knit_dir)) { dir.create(knit_dir, recursive = TRUE) }
-knit_Figure3 = paste0(knit_dir, "/Figure3.R")
-if (!file.exists(knit_Figure3)) {
-    knitr::purl(
-    input = "Figure3_pt2.Rmd",
-    output = knit_Figure3,
-    documentation = 1
+  knit_Figure4 = paste0(knit_dir, "/Figure4.R")
+  if (!file.exists(knit_Figure3)) {
+      knitr::purl(
+      input = "Figure4_pt2.Rmd",
+      output = knit_Figure3,
+      documentation = 1
     )
 }
 # Loading figure 3 data 
-source(knit_Figure3)
+source(knit_Figure4)
 ```
 ``` {r}
 M_heatmap_unsupp_full = Misame_corr_nutrients_unsupp %>%

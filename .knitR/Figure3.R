@@ -1,4 +1,4 @@
-## ----setup, include=FALSE------------------------------------------------------------------
+## ----setup, include=FALSE---------------------------------------------------------------------------------
 # Show code if file is knit 
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -10,18 +10,18 @@ if (interactive() && rstudioapi::isAvailable()) {
 }
 
 
-## ------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------
 # Load libraries and data 
 source("plotting_setup.R")
 # Load functions
 source("plotting_functions.R")
 
 
-## ------------------------------------------------------------------------------------------
+## ---------------------------------------------------------------------------------------------------------
 # Full set of features for the supplementary figure
 select_feats_full = c('Cit','Bio','K','Creatinine','Lys','LSTb','PA','B1','B2',
                  'HipAcid','C5','AABA','PC.ae.C34.0','LNnT','Se','FLNH',
-                 'TG.16.1_36.1.','TG.18.2_36.0.', "X6.SL", "Mn", "p.Cresol.SO4", 'B6', 'LNFP.III', 'g.tocopherol', 'X3.SL')
+                 'TG.16.1_36.1.','TG.18.2_36.0.', "X6.SL", 'B6', 'LNFP.III', 'g.tocopherol', 'X3.SL')
 # Selected features to highlight in main figure (see Figure S4 for full feature set)
 select_feats = c('C5', 'Se', 'X6.SL', 'Bio', 'PA', 'B2',  'AABA', 'LNnT') 
 

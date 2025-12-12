@@ -1,0 +1,397 @@
+---
+title: "Figure 6A-D. C5 serves as a central biomarker of mammary gland function 466 and infant growth, may be causally linked to low levels of Pantothenic Acid"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure 6A
+``` {r}
+C3_color = "lightblue"
+C4_color = "lightgreen"
+C5_color = "orange"
+
+# Plotting each subgraph depicting the association between acylcarnitine percentile values and WAZ outcome
+grid_C5_A1 = Misame_everything %>% filter(Timepoint==1) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M04)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) +  theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C5_B1 = Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M04)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C5_C1 = Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M04)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C5_D1 = Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M04)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C5_E1 = Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M04)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C5_F1 = Child_everything %>% 
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    ggplot(aes(x=C5_percentile, y = WAZ_M03)) + geom_boxplot(fill = "grey") + theme_minimal() + ylim(-5,5) + ylab(NULL) +  theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+
+
+
+grid_C4_A1 = Misame_everything %>% filter(Timepoint==1) %>%
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M04)) + geom_boxplot(fill = C4_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C4_B1 = Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M04)) + geom_boxplot(fill = C4_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C4_C1 = Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M04)) + geom_boxplot(fill = C4_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C4_D1 = Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M04)) + geom_boxplot(fill = C4_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C4_E1 = Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M04)) + geom_boxplot(fill = C4_color) + theme_minimal() + ylim(-5,3) + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C4_F1 = Child_everything %>% 
+    mutate(C4_percentile = cut(C4, 
+                               breaks = quantile(C4, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C4), C4_percentile %in% c("0-20%", "80-100%")) %>%
+    ggplot(aes(x=C4_percentile, y = WAZ_M03)) + geom_boxplot(fill = "grey") + theme_minimal() + ylim(-5,5) +  theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("") + ylab(NULL)
+
+
+grid_C3_A1 = Misame_everything %>% filter(Timepoint==1) %>%
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M04)) + geom_boxplot(fill = C3_color) + theme_minimal() + ylim(-5,3) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Misame: 14-21D")
+grid_C3_B1 = Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M04)) + geom_boxplot(fill = C3_color) + theme_minimal() + ylim(-5,3)  + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Misame: 1-2M")
+grid_C3_C1 = Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M04)) + geom_boxplot(fill = C3_color) + theme_minimal() + ylim(-5,3)  + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Misame: 3-4M")
+  
+grid_C3_D1 = Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M04)) + geom_boxplot(fill = C3_color) + theme_minimal() + ylim(-5,3) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Vital: 40D")
+grid_C3_E1 = Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M04)) + geom_boxplot(fill = C3_color) + theme_minimal() + ylim(-5,3)+ theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Vital: 56D")
+  
+grid_C3_F1 = Child_everything %>% 
+    mutate(C3_percentile = cut(C3, 
+                               breaks = quantile(C3, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C3), C3_percentile %in% c("0-20%", "80-100%")) %>%
+    ggplot(aes(x=C3_percentile, y = WAZ_M03)) + geom_boxplot(fill = "grey") + theme_minimal() + ylim(-5,5) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")#+ ggtitle("Child: 3M")
+
+# Arranging subgraphs as a grid
+Figure6A = ggarrange(
+  ggarrange(grid_C3_A1, grid_C3_B1, grid_C3_C1, grid_C3_D1, grid_C3_E1, grid_C3_F1, ncol = 1),
+  ggarrange(grid_C4_A1, grid_C4_B1, grid_C4_C1, grid_C4_D1, grid_C4_E1, grid_C4_F1, ncol = 1),
+  ggarrange(grid_C5_A1, grid_C5_B1, grid_C5_C1, grid_C5_D1, grid_C5_E1, grid_C5_F1, ncol = 1),
+  nrow = 1)
+Figure6A
+
+ggexport(Figure6A, filename=paste0(fig_path, "/Figure6A.pdf"),
+         width=750, height=450, dpi=300)
+ggexport(Figure6A, filename=paste0(fig_path, "/Figure6A.pdf"),
+         width=8, height=16, dpi=300)
+
+10*(750/450)
+```
+
+
+## Figure 6B: Effect of BEP on C5 levels (box-plot)
+``` {r}
+Figure6B = ggarrange(
+  Misame_everything %>% filter(Timepoint==1) %>% 
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") +
+    ggtitle("MISAME") + xlab("Postnatal BEP") + theme_minimal(),
+  Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") +
+    ggtitle("Mumta-LW") + xlab("Postnatal BEP") + theme_minimal(),
+  Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  nrow=1)
+
+Figure6B
+ggexport(Figure6B, filename=paste0(fig_path, "/Figure6B.pdf"),
+         width=7.3, height=4)
+```
+## Figure 6C: Pantothenic acid distributions per study
+``` {r}
+Figure6C = ggarrange(Misame_everything %>% filter(!is.na(Timepoint)) %>% ggplot(aes(x=PA, color = as.factor(BEP))) + 
+            geom_density(size=1) + ggtitle("MISAME") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+            geom_vline(xintercept = 10.95, linetype = "dashed", color = "black", size = 1) + facet_grid(TP_label~.),
+Vital_everything %>% filter(!is.na(Timepoint)) %>% ggplot(aes(x=PA, color = as.factor(BEP))) + 
+              geom_density(size=1) + ggtitle("Mumta-LW") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+  geom_vline(xintercept = 10.95, linetype = "dashed", color = "black", size = 1) + facet_grid(TP_label~.),
+Child_everything %>% filter(!is.na(Timepoint)) %>% ggplot(aes(x=PA)) + 
+    geom_density(size=1) + ggtitle("CHILD") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+  geom_vline(xintercept = 10.95, linetype = "dashed", color = "black", size = 1) + facet_grid(TP_label~.), nrow = 1, common.legend = TRUE) 
+Figure6C
+
+ggsave("C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures/Figure6C.pdf",
+         plot = Figure6C, width = 6, height = 4, dpi = 600)
+
+# Calculate percent of mothers with levels below PA threshold per Timepoint/BEP status: 
+RV_proportion_calc = function (df, label="") {
+  df_filt = df %>% filter(!is.na(PA))
+  moms_below_RV = df_filt %>% filter(PA < 10.95) %>% pull(SUBJID) %>% unique() %>% length()
+  all_moms = df_filt %>% pull(SUBJID) %>% unique() %>% length()
+  val = 100*(moms_below_RV/all_moms)
+  print(paste0(label, ": ", round(val, 4), "%"))
+}
+
+# proportions of mothers ever deficient in PA
+RV_proportion_calc(Misame_everything, "MISAME all mothers")
+RV_proportion_calc(Vital_everything, "Mumta-LW all mothers")
+RV_proportion_calc(Child_everything, "CHILD all mothers")
+
+# proportions of mothers deficient in PA per timepoint per arm
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==1, BEP==1),
+                   "MISAME TP1 (supplemented)")
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==1, BEP==0),
+                   "MISAME TP1 (unsupplemented)")
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==2, BEP==1),
+                   "MISAME TP2 (supplemented)")
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==2, BEP==0),
+                   "MISAME TP2 (unsupplemented)")
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==3, BEP==1),
+                   "MISAME TP3 (supplemented)")
+RV_proportion_calc(Misame_everything %>% filter(Timepoint==3, BEP==0),
+                   "MISAME TP3 (unsupplemented)")
+RV_proportion_calc(Vital_everything %>% filter(Timepoint==1, BEP==1),
+                   "Mumta-LW TP1 (supplemented)")
+RV_proportion_calc(Vital_everything %>% filter(Timepoint==1, BEP==0),
+                   "Mumta-LW TP1 (unsupplemented)")
+RV_proportion_calc(Vital_everything %>% filter(Timepoint==2, BEP==1),
+                   "Mumta-LW TP2 (supplemented)")
+RV_proportion_calc(Vital_everything %>% filter(Timepoint==2, BEP==0),
+                   "Mumta-LW TP2 (unsupplemented)")
+
+```
+
+## Figure 6D Association between C5 percentile categories and PA level
+``` {r}
+grid_C5_PA_A1 = Misame_everything %>% filter(Timepoint==1) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = C5_color) + theme_minimal()  + ylab(NULL) +  theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("") + ylab("Pantothenic Acid (uM)")
+grid_C5_PA_B1 = Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = C5_color) + theme_minimal() + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C5_PA_C1 = Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (misame_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = C5_color) + theme_minimal()  + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+      stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C5_PA_D1 = Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = C5_color) + theme_minimal()  + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+grid_C5_PA_E1 = Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    left_join (vital_weight_diff_df_3m) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = C5_color) + theme_minimal()  + ylab(NULL) + theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+  
+grid_C5_PA_F1 = Child_everything %>% 
+    mutate(C5_percentile = cut(C5, 
+                               breaks = quantile(C5, probs = 0:5 / 5, na.rm = TRUE), 
+                               include.lowest = TRUE, 
+                               labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+
+    filter(!is.na(C5), C5_percentile %in% c("0-20%", "80-100%")) %>%
+    ggplot(aes(x=C5_percentile, y = PA)) + geom_boxplot(fill = "grey") + theme_minimal()  + ylab(NULL) +  theme(plot.margin = margin(0, 0, 0, 0))+ 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") + ggtitle("")
+Figure6D = ggarrange(grid_C5_PA_A1, grid_C5_PA_B1, grid_C5_PA_C1, grid_C5_PA_D1, grid_C5_PA_E1, grid_C5_PA_F1, nrow = 1)
+Figure6D
+
+ggexport(Figure6D,
+         filename=paste0(fig_path, "/Figure_6D.pdf"),
+         width=9.7, height=4, dpi=300)
+```
+
