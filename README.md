@@ -14,8 +14,8 @@
 - zscorer - for hcaz calculations
 - purrr - for complex iteration
 ### Python enviroments:
-joint_rpca.yml
-ml_environment.yml
+- joint_rpca.yml
+- ml_environment.yml
 
 ## Repository Structure
 ~~~text
