@@ -1,8 +1,4 @@
----
-title: "Figure 4C. Leveraging universal infant growth and maternal nutritional signals to identify putative growth-associated biomarkers of mammary gland dysfunction"
----
-
-```{r setup, include=FALSE}
+## ----setup, include=FALSE---------------------------------------------------------------------------------------------------------------------
 # Show code if file is knit 
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -12,18 +8,16 @@ if (interactive() && rstudioapi::isAvailable()) {
   rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
   setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
 }
-```
 
-# Load data, libraries, functions
-``` {r}
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------
 # Load libraries and data 
 source("plotting_setup.R")
 # Load functions
 source("plotting_functions.R")
-```
 
-## Figure 4C 
-``` {r}
+
+## ---------------------------------------------------------------------------------------------------------------------------------------------
 # Full set of features for the supplementary figure
 select_feats_full = c('Cit','Bio','K','Creatinine','Lys','LSTb','PA','B1','B2',
                  'HipAcid','C5','AABA','PC.ae.C34.0','LNnT','Se','FLNH',
@@ -172,5 +166,4 @@ Figure4C
 ggexport(filename = paste0(fig_path, "/Figure4C.pdf"),
          plot = Figure4C,
         width = 5.3, height = 4)
-```
 

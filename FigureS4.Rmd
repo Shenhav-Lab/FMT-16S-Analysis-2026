@@ -30,10 +30,10 @@ Requires objects from Figure 4C
 knit_dir = ".knitR"
 if (!dir.exists(knit_dir)) { dir.create(knit_dir, recursive = TRUE) }
   knit_Figure4 = paste0(knit_dir, "/Figure4.R")
-  if (!file.exists(knit_Figure3)) {
+  if (!file.exists(knit_Figure4)) {
       knitr::purl(
       input = "Figure4_pt2.Rmd",
-      output = knit_Figure3,
+      output = knit_Figure4,
       documentation = 1
     )
 }
