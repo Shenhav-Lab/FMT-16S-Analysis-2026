@@ -1,0 +1,529 @@
+---
+title: "FMT 16S Microbiome Analysis"
+author: "April Jauhal"
+date: "2026-04-16"
+output: html_document
+---
+This notebook contains code used for figure analysis in figures 1 and 2. In this workflow, 16S data is processed, alpha and beta diversity and ANCOMBC2 analysis is performed, and data is formatted for RPCA analysis (see RPCA.ipynb). Also contains code used to generate Figure 1, as well as example code for the generation of figure 2 (final Figure 2 subfigures were generated in PRISM).  
+
+## Data Processing
+Set Directory 
+``` {r}
+FMT_dir = "C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Morrowitz_16S/2024_Jul_FMT/"
+FMT_figpath = paste0(FMT_dir, "/Figures/")
+FMT_RPCA_path = paste0(FMT_dir, "/RPCA_3/")
+```
+Loading libraries
+``` {r}
+library(dplyr)
+library(phyloseq)
+library(readxl)
+library(stringr)
+library(vegan)
+library(ggplot2)
+library(ggpubr)
+library(ANCOMBC)
+library(ggprism)
+```
+Defining colors for plots to align with prism color scheme
+``` {r}
+five_colors <- c(
+  "FMT-ABX" = "#AD07E3",
+  "FMT-HD" = "#FF8000",
+  "PBS" = "#00C000",
+  "Untreated" = "#0000FF", 
+  "ABX (2W)" = "#FF0000")
+ 
+three_colors <- c(
+  "FMT-ABX" = "#FF0000",
+  "FMT-HD" = "#00C000",
+  "PBS" = "#0000FF"
+)
+
+four_colors <- c(
+  "FMT-ABX" = "#AD07E3",
+  "FMT-HD" = "#FF8000",
+  "PBS" = "#00C000",
+  "Untreated" = "#0000FF")
+```
+Loading 16S dataset and converting to physeq objects
+``` {r}
+theme_set(theme_bw())
+
+# Create figure path if it doesn't already exist
+if (!dir.exists(FMT_figpath)) {
+  dir.create(FMT_figpath, recursive = TRUE)
+}
+
+count_table = read_xlsx(paste0(FMT_dir, "FMT_July2024_16S_Sequencing_Stats.xlsx"),
+                        sheet="Microbial Composition") %>% 
+  dplyr::rename(taxonomy=`Amplicon Sequencing Variant (ASV)`) 
+sample_info = read_xlsx(paste0(FMT_dir, "FMT_July2024_16S_Sequencing_Stats.xlsx"),
+                        sheet="Metadata") %>% 
+  as.data.frame() %>% mutate(Cage = paste0(Label, "_", Cage)) %>%
+  mutate(Treatment = case_when(Label == "ABX" ~ "ABX (2W)",
+                               Label == "Donor" ~ "Donor", 
+                               Label == "FMTABX" ~ "FMT-ABX",
+                               Label == "FMTCTRL" ~ "FMT-HD",
+                               Label == "FMTPBS" ~ "PBS",
+                               Label == "Naive" ~ "Untreated",
+                               TRUE ~ NA,
+                               ))
+
+
+bridge_otu_df = count_table %>% dplyr::select(`taxonomy`) 
+bridge_otu_df$ID = paste0("otu_", 1:nrow(bridge_otu_df))
+
+
+tax_df <- data.frame(str_split(count_table$taxonomy, ';')) %>% t() %>% data.frame
+colnames(tax_df) <- c("Domain", "Phylum",  "Class",  "Order",  "Family",  "Genus", "Species")
+tax_df <- tax_df %>% dplyr::mutate(taxonomy = apply(., 1, function(row) paste(row, collapse = ";"))) %>% left_join(bridge_otu_df) %>% dplyr::select(-taxonomy) %>% tibble::column_to_rownames('ID') 
+tax_df[] <- lapply(lapply(tax_df, function(x) sub("[a-z]__", "", x)), function(x) sub("^__$", "Unknown", x)) 
+
+new_taxa_table = tax_df %>% slice(0)
+for (each_genus in unique(tax_df$Genus)) {
+  subset_df = tax_df %>% filter(Genus==each_genus)
+  if (each_genus %in% c("uncultured", "Unknown")) {
+    subset_df = subset_df %>% mutate(Genus = paste0(Genus, "_", row_number()))
+  }
+  new_taxa_table = rbind(new_taxa_table, subset_df)
+}
+
+
+otu_df = count_table %>% left_join(bridge_otu_df) %>% select(-taxonomy) %>% tibble::column_to_rownames('ID')
+rownames(sample_info) <- sample_info$Sample
+
+# Version for original relative abundance
+FMT_physeq_rel = phyloseq(otu_table(otu_df, taxa_are_rows=TRUE), tax_table(as.matrix(new_taxa_table)), sample_data(sample_info))
+
+seq_stats = read_xlsx(paste0(FMT_dir, "FMT_July2024_16S_Sequencing_Stats.xlsx"),
+                      sheet="Sequencing Statistics")
+count_data = otu_df
+for (sampleid in seq_stats$`Sample Name`) {
+  num_reads = seq_stats %>% filter(`Sample Name`==sampleid) %>% pull(`Total Read Pairs`)
+  count_data[sampleid] <- round(count_table[sampleid]*num_reads, digits = 0)
+}
+
+# Version for whole counts 
+FMT_physeq_counts = phyloseq(otu_table(as.matrix(count_data), taxa_are_rows=TRUE), tax_table(as.matrix(new_taxa_table)), sample_data(sample_info))
+``` 
+Filtering out mitochondria and choloroplast DNA and calculating relative abundance
+``` {r}
+# Version for relative abundance without mitochondria/chloroplasts
+FMT_physeq_filtered_rel = transform_sample_counts(subset_taxa(FMT_physeq_rel, !Genus %in% c("Mitochondria", "Chloroplast")), function(x) x / sum(x))
+
+# Version for whole counts without michrondria/chloroplasts
+FMT_physeq_filtered_counts = subset_taxa(FMT_physeq_counts, !Genus %in% c("Mitochondria", "Chloroplast"))
+```
+# Constructing relative abundance barplots (class)
+barplots are shown in Figure 1B
+``` {r}
+library(RColorBrewer)
+set.seed(2)
+palette <- colorRampPalette(brewer.pal(12, "Paired"))(50)
+palette_scrambled <- sample(palette, 50)
+
+# class-level plotting data
+plot_data_class0 = FMT_physeq_filtered_rel %>%
+  tax_glom(taxrank = "Class") %>%                     
+  psmelt() %>% group_by(Class, Sample) %>% dplyr::summarize(class_count = sum(Abundance)) %>% left_join(sample_data(FMT_physeq_filtered_rel)) 
+class_1perc = plot_data_class0 %>% group_by(Class) %>% 
+  dplyr::summarize(max = max(class_count)) %>%
+  filter(max >= 0.01) %>% pull(Class)
+plot_data_class = plot_data_class0 %>% mutate(Class = ifelse(Class %in% class_1perc, Class, "Other"))
+
+
+collapse_class <- function(label, timepoint) {
+  df = plot_data_class %>%
+      filter(Label==label, Timepoint==timepoint) %>%
+            group_by(Label, Class) %>%
+      dplyr::summarize(x=sum(class_count), Timepoint=timepoint, Label=label) %>%
+        unique() 
+  return(df %>% mutate(class_count = x/sum(df$x, na.rm = TRUE)))
+}
+grouped_plot_data_class <- do.call(rbind,
+        list(collapse_class("FMTPBS", 0),
+             collapse_class("FMTPBS", 14),
+             collapse_class("FMTPBS", 24),
+             collapse_class("FMTCTRL", 0),
+             collapse_class("FMTCTRL", 14),
+             collapse_class("FMTCTRL", 24),
+             collapse_class("FMTABX", 0),
+             collapse_class("FMTABX", 14),
+             collapse_class("FMTABX", 24)))
+rel_barplot_class = ggarrange(
+  ggplot(grouped_plot_data_class %>%
+           mutate(Label = ifelse(Label=="FMTABX", "FMT-ABX",
+                                 ifelse(Label=="FMTPBS", "PBS",
+                                        ifelse(Label=="FMTCTRL", "FMT-HD", NA)))), aes(y=as.factor(Timepoint), x=class_count, fill=Class)) + geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        legend.position = "bottom", 
+        strip.text.y= element_text(size=8),
+        strip.text.x= element_text(size=8)) +
+  facet_grid(.~Label) +
+  scale_fill_manual(values = palette_scrambled) + scale_color_manual(values = palette_scrambled) + ylab("Timepoint") + xlab("Relative Abundance"),
+  ggplot(plot_data_class %>% filter(!is.na(FMT_Donor)) %>%
+           mutate(Subject = ifelse(Subject=="Donor_Abx", "Antibiotics",
+                                 ifelse(Subject=="Donor_CTRL", "Control", NA))), aes(y=as.factor(Subject), x=class_count, fill=Class)) + geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        strip.text.y= element_text(size=8),
+        strip.text.x= element_text(size=8)) +
+  scale_fill_manual(values = palette_scrambled) + scale_color_manual(values = palette_scrambled) + ylab("Donor") + xlab("Relative Abundance"),
+  common.legend = TRUE, widths = c(2,1), legend = "bottom")
+rel_barplot_class
+ggexport(rel_barplot_class, dpi = 600, width = 700, height=200, filename = paste0(FMT_figpath, "rel_barplot_class.png"))
+```
+
+## Alpha Diversity analysis
+Alpha diversity analysis was initially performed by SeqCenter, results are parsed here and used to generate sublots for Figure 1FG.
+``` {r}
+Alpha_df = read_xlsx(paste0(FMT_dir, "FMT_July2024_16S_Sequencing_Stats.xlsx"),
+                     sheet="Alpha Diversity Metrics")
+div_sample_data = sample_data(FMT_physeq_filtered_rel) %>% data.frame() %>% left_join(Alpha_df) 
+
+rownames(div_sample_data) <- div_sample_data$Sample
+sample_data(FMT_physeq_filtered_rel) <- sample_data(div_sample_data)
+
+rich_plot = ggplot(div_sample_data %>% filter(!is.na(Timepoint), Timepoint==24) %>%
+                     mutate(TP_label = ifelse(Timepoint==24, "Day 24", NA)), 
+                   aes(x=Treatment, y=`Observed Features`, color=Treatment)) +
+    geom_boxplot(show.legend = FALSE) + geom_jitter(width = 0.2, height = 0, size = 1) +
+    facet_grid(.~TP_label) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+    theme(legend.position = "left") +
+    geom_point() + theme(legend.position = "none") +
+    stat_compare_means(comparisons = list(c("FMT-HD", "Untreated"),
+                                          c("PBS", "Untreated"),
+                                          c("FMT-ABX", "Untreated")), label = "p.signif",
+                       bracket.size = 0.75, tip.length = 0) 
+
+faith_plot = ggplot(div_sample_data %>% filter(!is.na(Timepoint), Timepoint==24) %>%
+                     mutate(TP_label = ifelse(Timepoint==24, "Day 24", NA)), 
+                    aes(x=Treatment, y=`Faith's Phylogenetic Diversity`, color=Treatment)) +
+    geom_boxplot(show.legend = FALSE) + geom_jitter(width = 0.2, height = 0, size = 1) +
+    facet_grid(.~TP_label) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+    theme(legend.position = "left") +
+    geom_point() + theme(legend.position = "none") +
+    stat_compare_means(comparisons = list(c("FMT-HD", "Untreated"),
+                                          c("PBS", "Untreated"),
+                                          c("FMT-ABX", "Untreated")), label = "p.signif",
+                       bracket.size = 0.75, tip.length = 0) 
+
+rich_prism_plot = rich_plot + theme_prism(base_size = 12) +
+  scale_color_manual(values = four_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+faith_prism_plot = faith_plot + theme_prism(base_size = 12) +
+  scale_color_manual(values = four_colors) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+alpha_div_plot = ggarrange(rich_prism_plot, faith_prism_plot, nrow = 1)
+
+ggexport(alpha_div_plot,
+         dpi = 300, width = 600, height = 400, filename = paste0(FMT_figpath, "diversity.png"))
+alpha_div_plot
+```
+## Beta diversity analysis
+Beta diversity calculations were performed on filtered relative abundance data
+``` {r}
+meta = data.frame(sample_data(FMT_physeq_filtered_rel)) %>%
+  mutate(Treatment = case_when(Label == "ABX" ~ "ABX (2W)",
+                               Label == "Donor" ~ "Donor", 
+                               Label == "FMTABX" ~ "FMT-ABX",
+                               Label == "FMTCTRL" ~ "FMT-HD",
+                               Label == "FMTPBS" ~ "PBS",
+                               Label == "Naive" ~ "Untreated",
+                               TRUE ~ NA,
+                               ))
+otu = t(otu_table(FMT_physeq_filtered_rel))
+jsd_res <- distance(t(otu_table(FMT_physeq_filtered_rel)), method='jsd')
+
+jaccard = distance(otu, method='jaccard')
+
+FMT_genus <- tax_glom(FMT_physeq_filtered_rel, taxrank = "Genus", NArm = TRUE) 
+otu_genus = t(otu_table(FMT_genus)) 
+jaccard_genus = distance(otu_genus, method='jaccard')
+
+FMT_family <- tax_glom(FMT_physeq_filtered_rel, taxrank = "Family", NArm = TRUE) 
+otu_family = t(otu_table(FMT_family)) 
+jaccard_family = distance(otu_family, method='jaccard')
+```
+Comparing ABX-treated and FMT-ABX samples to initial timepoint
+``` {r}
+jaccard_FMT_dur_df = data.frame(Label=character(), Comparison=logical(), TP_Comparison=logical(), Jaccard=numeric())
+
+Sample_list5 = list(meta %>% filter(Label=="FMTCTRL", Timepoint %in% c(24, 14, 0)) %>% pull(Sample),
+                    meta %>% filter(Label=="FMTABX", Timepoint %in% c(24, 14, 0 )) %>% pull(Sample),
+                    meta %>% filter(Label=="FMTPBS", Timepoint %in% c(24, 14, 0 )) %>% pull(Sample))
+for (Samples in Sample_list5) {
+  for(each_sample in Samples) {
+    
+    Sample_Label = meta %>% filter(Sample==each_sample) %>% pull(Treatment)
+    Sample_Time = meta %>% filter(Sample==each_sample) %>% pull(Timepoint)
+    
+    for (compare_sample in unlist(Sample_list5[Sample_list5!=each_sample])) {
+      Compare_Sample_Label = meta %>% filter(Sample==compare_sample) %>% pull(Treatment) 
+      Compare_Sample_Time = meta %>% filter(Sample==compare_sample) %>% pull(Timepoint) 
+
+      each_df = data.frame(Treatment=Sample_Label, 
+                           Comparison = ifelse(Sample_Label==Compare_Sample_Label, 'Self', 'Other'),
+                           TP_Comparison =  case_when(Sample_Time == 24 & Compare_Sample_Time == 24  ~ "24 vs. 24 Days",
+                                                      Sample_Time == 24 & Compare_Sample_Time == 14 ~ "24 vs. 14 Days",
+                                                      Sample_Time == 14 & Compare_Sample_Time == 24 ~ "14 vs. 24 Days",
+                                                      Sample_Time == 14 & Compare_Sample_Time == 14 ~ "14 vs. 14 Days",
+                                                      Sample_Time == 0 & Compare_Sample_Time == 0 ~ "0 vs. 0 Days",
+                                                      Sample_Time == 0 & Compare_Sample_Time == 14 ~ "0 vs. 14 Days",
+                                                      Sample_Time == 14 & Compare_Sample_Time == 0 ~ "14 vs. 0 Days",
+                                                      Sample_Time == 0 & Compare_Sample_Time == 24 ~ "0 vs. 24 Days",
+                                                      Sample_Time == 24 & Compare_Sample_Time == 0 ~ "24 vs. 0 Days",
+                                                      TRUE ~ "Other"),
+                           Jaccard=as.matrix(jaccard)[each_sample, compare_sample])
+      jaccard_FMT_dur_df = rbind(jaccard_FMT_dur_df, each_df)
+    }
+  }
+}
+```
+Building subplots for figure 1CDE
+``` {r}
+jaccard_FMPT_dur_subplot1 = jaccard_FMT_dur_df %>% filter(Comparison=="Self", TP_Comparison %in% c('0 vs. 0 Days', '0 vs. 14 Days', '0 vs. 24 Days')) %>% ggplot(aes(x=TP_Comparison, y=Jaccard, color = Treatment)) + geom_boxplot() + 
+  geom_jitter(width = 0.2, height = 0, size = 1) + xlab("Comparison") + ylab("Pairwise Jaccard Distances") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    stat_compare_means(comparisons = list(c("0 vs. 0 Days", "0 vs. 14 Days"),
+                                          c("0 vs. 14 Days", "0 vs. 24 Days")), 
+                       bracket.size = 0.75, tip.length = 0) + facet_grid(.~Treatment)
+  
+jaccard_FMPT_dur_subplot2 =   jaccard_FMT_dur_df %>% filter(Comparison=="Self", TP_Comparison %in% c('0 vs. 14 Days')) %>% ggplot(aes(x=Treatment, y=Jaccard, color = Treatment)) + geom_boxplot() + geom_jitter(width = 0.2, height = 0, size = 1) +
+  xlab("Comparison") + ylab("Pairwise Jaccard Distances") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    stat_compare_means(comparisons = list(c("FMT-ABX", "FMT-HD"),
+                                          c("FMT-ABX", "PBS"),
+                                          c("PBS", "FMT-HD")), 
+                       bracket.size = 0.75, tip.length = 0) + facet_grid(.~TP_Comparison)
+jaccard_FMPT_dur_subplot3 =     jaccard_FMT_dur_df %>% filter(Comparison=="Self", TP_Comparison %in% c('0 vs. 24 Days')) %>% ggplot(aes(x=Treatment, y=Jaccard, color = Treatment)) + geom_boxplot() + geom_jitter(width = 0.2, height = 0, size = 1) +
+  xlab("Comparison") + ylab("Pairwise Jaccard Distances") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    stat_compare_means(comparisons = list(c("FMT-ABX", "FMT-HD"),
+                                          c("FMT-ABX", "PBS"),
+                                          c("PBS", "FMT-HD")), 
+                       bracket.size = 0.75, tip.length = 0) + facet_grid(.~TP_Comparison)
+
+jaccard_FMPT_dur_subprism1 = jaccard_FMPT_dur_subplot1 + theme_prism(base_size = 12) +
+  scale_color_manual(values = three_colors) + theme(legend.position="none",
+                                                    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+jaccard_FMPT_dur_subprism2 = jaccard_FMPT_dur_subplot2 + theme_prism(base_size = 12) +
+  scale_color_manual(values = three_colors) + theme(legend.position="none",
+                                                    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+jaccard_FMPT_dur_subprism3 = jaccard_FMPT_dur_subplot3 + theme_prism(base_size = 12) +
+  scale_color_manual(values = three_colors) + theme(legend.position="none",
+                                                    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+jaccard_FMT_dur_plot_prism = ggarrange(jaccard_FMPT_dur_subprism1, jaccard_FMPT_dur_subprism2, jaccard_FMPT_dur_subprism3, nrow = 1, widths = c(2,1, 1))
+jaccard_FMT_dur_plot_prism
+
+ggexport(jaccard_FMT_dur_plot_prism,
+         dpi = 300, width = 600, height = 400, filename = paste0(FMT_figpath, "Treatment_effect.png"))
+
+```
+Comparing day 24 samples to their donors for supplementary figure 1
+``` {r}
+jaccard_donor_df = data.frame(Label=character(), Cagemate=logical(), Jaccard=numeric())
+
+Sample_list2 = list(meta %>% filter(Label=="FMTCTRL", Timepoint==24) %>% pull(Sample),
+                    meta %>% filter(Label=="FMTABX", Timepoint==24) %>% pull(Sample),
+                    meta %>% filter(Label=="FMTPBS", Timepoint==24) %>% pull(Sample))
+for (Samples in Sample_list2) {
+  for(each_sample in Samples) {
+    
+    Sample_Label = meta %>% filter(Sample==each_sample) %>% pull(Treatment)
+
+    for (compare_sample in meta %>% filter(!is.na(FMT_Donor)) %>% pull(Sample)) {
+      Donor_type = meta %>% filter(Sample==compare_sample) %>% pull(FMT_Donor) 
+      each_df = data.frame(Treatment=Sample_Label, 
+                           Donor_type = Donor_type,
+                           Jaccard=as.matrix(jaccard)[each_sample, compare_sample])
+      jaccard_donor_df = rbind(jaccard_donor_df, each_df)
+    }
+  }
+}
+
+jaccard_donor_plot = jaccard_donor_df %>% 
+  mutate(Donor_label = case_when(Donor_type=="Donor_ABX" ~ "ABX-treated Donor",
+                                 Donor_type=="Donor_CTRL" ~ "Control Donor",
+                                 TRUE ~ NA)) %>%
+  ggplot(aes(x=Donor_label, y=Jaccard, color = Treatment)) + geom_boxplot() + geom_jitter(width = 0.2, height = 0, size = 1) + 
+  ylab("\nDay 24 Jaccard Distance to Donor") + xlab("Donor Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = 'none') +
+  stat_compare_means(comparisons = list(c("ABX-treated Donor", "Control Donor")),
+                     bracket.size = 0.75, tip.length = 0) + facet_grid(.~Treatment) 
+
+jaccard_donor_plot2 = jaccard_donor_df %>% 
+  mutate(Donor_label = case_when(Donor_type=="Donor_ABX" ~ "ABX-treated Donor",
+                                 Donor_type=="Donor_CTRL" ~ "Control Donor",
+                                 TRUE ~ NA)) %>%
+  ggplot(aes(x=Treatment, y=Jaccard, color = Treatment)) + geom_boxplot() + geom_jitter(width = 0.2, height = 0, size = 1) + 
+  ylab("Day 24 Jaccard Distance to Donor") + xlab("Treatment") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = 'none') +
+  stat_compare_means(comparisons = list(c("FMT-ABX", "FMT-HD"),
+                                          c("FMT-ABX", "PBS"),
+                                          c("PBS", "FMT-HD")),
+                     bracket.size = 0.75, tip.length = 0) + facet_grid(.~Donor_label)
+
+jaccard_donor_prism_plot =jaccard_donor_plot + theme_prism(base_size = 12) +
+  scale_color_manual(values = three_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        legend.position = 'none')
+
+jaccard_donor_prism_plot2 = jaccard_donor_plot2 + theme_prism(base_size = 12) +
+  scale_color_manual(values = three_colors) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        legend.position = 'none')
+
+ggarrange(jaccard_donor_prism_plot, jaccard_donor_prism_plot2)
+ggexport(ggarrange(jaccard_donor_prism_plot, jaccard_donor_prism_plot2),
+         dpi = 300, width = 500, height = 400, filename = paste0(FMT_figpath, "Donor_comparison.png"))
+```
+
+## ANCOMBC2 analysis
+Main analysis (Results used to construct Figure 2D in PRISM)
+``` {r}
+set.seed(123)
+res_label_24_genus <- ancombc2(data = subset_samples(subset_samples(FMT_physeq_filtered_counts, Label %in% c("FMTABX", "FMTCTRL", "FMTPBS")), Timepoint ==24),
+                          tax_level = "Genus",
+                          fix_formula = "Label",
+                          rand_formula = NULL,
+                          p_adj_method = "holm", pseudo_sens = TRUE,
+                          prv_cut = 0, lib_cut = 0, s0_perc = 0.05,
+                          group = "Label", struc_zero = TRUE, neg_lb = FALSE,
+                          alpha = 0.05, n_cl = 2, verbose = TRUE,
+                          global = TRUE, pairwise = TRUE, dunnet = TRUE, trend = FALSE,
+                          iter_control = list(tol = 1e-2, max_iter = 20, 
+                                              verbose = TRUE),
+                          em_control = list(tol = 1e-5, max_iter = 100),
+                          lme_control = NULL,
+                          mdfdr_control = list(fwer_ctrl_method = "holm", B = 100),
+                          trend_control = NULL)
+res_24_genus = res_label_24_genus$res_pair
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTCTRL, fill = diff_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTCTRL vs. FMTABX") + labs(fill="Significance")
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTPBS, fill = diff_LabelFMTPBS)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTABX ") + labs(fill="Significance")
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS_LabelFMTCTRL) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTPBS_LabelFMTCTRL, fill = diff_LabelFMTPBS_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTCTRL") + labs(fill="Significance")
+
+res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL)
+
+res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL, q_LabelFMTCTRL) %>% filter(p_LabelFMTCTRL < 0.05)
+
+res_24_genus %>% 
+  mutate(fold_change = exp(lfc_LabelFMTCTRL), log_fold_change = log(fold_change, base = exp(1))) %>%
+  dplyr::select(taxon, fold_change, log_fold_change) %>% 
+  write.csv(paste0(FMT_dir, "fold_change_values.csv"))
+
+```
+
+Additional analysis: To evaluate the hypothesis that the Roseburia enrichment in the FMT-ABX group was already present at day 14, we leveraged ANCOMBC2 analysis for Day 14 data and found that Roseburia was already enriched in FMT-ABX vs. FMT-HD prior to FMT treatment (p=0.032).
+``` {r}
+genus_meta_df = otu_table(FMT_genus) %>% t() %>% data.frame() %>% tibble::rownames_to_column("Sample") %>%
+  left_join(meta)
+Roseburia = FMT_physeq_filtered_counts %>% tax_table ()%>% as.data.frame() %>% filter(Genus=="Roseburia") %>% rownames()
+
+ggplot(genus_meta_df %>% filter(Timepoint==14, Label %in% c("FMTABX", "FMTCTRL")), aes(x=Label, y=!!sym(Roseburia))) + geom_boxplot() + facet_grid(.~Timepoint) +
+  stat_compare_means(comparisons = list(c("FMTABX", "FMTCTRL"))) + ylab("Roseburia")
+
+```
+
+## Data processing for RPCA analysis
+Loaded physeq data is processed for analysis via FMT_RPCA.ipynb
+``` {r}
+FMT_physeq_nodonor_24 <- subset_samples(subset_samples(FMT_physeq_filtered_counts %>% tax_glom(taxrank = "Genus"), Label %in% c("FMTABX", "FMTCTRL", "FMTPBS")),
+                                        Timepoint==24)
+sample_metadata_rpca <- data.frame(sample_data(FMT_physeq_nodonor_24)) %>% rename(sampleid=Sample) %>% select(sampleid, everything())
+subject_metadata_rpca <- sample_metadata_rpca %>% select(Subject, Label) %>% unique()
+
+# Uncomment to prepare files for CTF
+library(biomformat)
+FMT_physeq.biom <- make_biom(otu_table(FMT_physeq_nodonor_24))
+#write_biom(FMT_physeq.biom, biom_file="paste0(FMT_RPCA_path, "/16S_forRPCA.biom")
+# write.table(sample_metadata_rpca, file=paste0(FMT_RPCA_path, "RPCA_sample_metadata.tsv",
+#             quote=FALSE, sep='\t', row.names = FALSE)
+# write.table(subject_metadata_rpca, file=paste0(FMT_dir, "RPCA_subject_metadata.tsv",
+#             quote=FALSE, sep='\t', row.names = FALSE)
+```
+Loaded results following RPCA analysis via FMT_RPCA.ipynb
+``` {r}
+ord_text = readLines(paste0(FMT_RPCA_path, "/16S_RPCA/biplot_unzipped/629da861-81c6-48df-a17a-8f24eeca9919/data/ordination.txt"))
+
+feat_ord = read.table(textConnection(ord_text[str_detect(ord_text, "otu")]), header = FALSE, col.names = c("Feature", "PC1", "PC2", "PC3")) %>% 
+  left_join(tax_table(FMT_physeq_nodonor_24) %>% 
+              as.data.frame() %>% tibble::rownames_to_column("Feature"))
+ 
+otu_filt_counts = FMT_physeq_filtered_counts %>% otu_table %>% as.data.frame()
+tax_filt = FMT_physeq_filtered_counts %>% tax_table %>% as.data.frame()
+perc_10 = round(nrow(feat_ord)/10) 
+
+PC1_full_num = otu_filt_counts[feat_ord %>% filter(PC1<0) %>% pull(Feature),] %>% colSums()
+PC1_full_denom = otu_filt_counts[feat_ord %>% filter(PC1>=0) %>% pull(Feature),] %>% colSums()
+PC2_full_num = otu_filt_counts[feat_ord %>% filter(PC2<0) %>% pull(Feature),] %>% colSums()
+PC2_full_denom = otu_filt_counts[feat_ord %>% filter(PC2>=0) %>% pull(Feature),] %>% colSums()
+PC3_full_num = otu_filt_counts[feat_ord %>% filter(PC3<0) %>% pull(Feature),] %>% colSums()
+PC3_full_denom = otu_filt_counts[feat_ord %>% filter(PC3>=0) %>% pull(Feature),] %>% colSums()
+
+
+PC1_10perc_num = otu_filt_counts[feat_ord %>% arrange(desc(PC1)) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+PC1_10perc_denom = otu_filt_counts[feat_ord %>% arrange(PC1) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+PC2_10perc_num = otu_filt_counts[feat_ord %>% arrange(desc(PC2)) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+PC2_10perc_denom = otu_filt_counts[feat_ord %>% arrange(PC2) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+PC3_10perc_num = otu_filt_counts[feat_ord %>% arrange(desc(PC3)) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+PC3_10perc_denom = otu_filt_counts[feat_ord %>% arrange(PC3) %>% slice(1:perc_10) %>% pull(Feature),] %>% colSums()
+
+
+PC1_full = log(PC1_full_num/PC1_full_denom) %>% data.frame(PC1_full=.) %>% tibble::rownames_to_column("sampleid")
+PC2_full = log(PC2_full_num/PC2_full_denom) %>% data.frame(PC2_full=.) %>% tibble::rownames_to_column("sampleid")
+PC3_full = log(PC3_full_num/PC3_full_denom) %>% data.frame(PC3_full=.) %>% tibble::rownames_to_column("sampleid")
+PC1_10perc = log(PC1_10perc_num/PC1_10perc_denom) %>% data.frame(PC1_10perc=.) %>% tibble::rownames_to_column("sampleid")
+PC2_10perc = log(PC2_10perc_num/PC2_10perc_denom) %>% data.frame(PC2_10perc=.) %>% tibble::rownames_to_column("sampleid")
+PC3_10perc = log(PC3_10perc_num/PC3_10perc_denom) %>% data.frame(PC3_10perc=.) %>% tibble::rownames_to_column("sampleid")
+
+log_ratio_df = full_join(full_join(full_join(full_join(full_join(PC1_full, PC2_full),
+                                                       PC3_full), 
+                                             PC1_10perc), 
+                                   PC2_10perc), 
+                         PC3_10perc)
+
+
+subj_ord = read.table(textConnection(ord_text[str_detect(ord_text, "FMT")]), header = FALSE, col.names = c("sampleid", "PC1", "PC2", "PC3")) %>% left_join(log_ratio_df) %>% left_join(sample_metadata_rpca) 
+
+PC2_denom_df = tax_filt[feat_ord %>% arrange((PC2)) %>% slice(1:perc_10) %>% pull(Feature),] %>% dplyr::select(Class, Genus)
+PC2_num_df = tax_filt[feat_ord %>% arrange(desc(PC2)) %>% slice(1:perc_10) %>% pull(Feature),] %>% dplyr::select(Class, Genus)
+PC3_denom_df = tax_filt[feat_ord %>% arrange((PC3)) %>% slice(1:perc_10) %>% pull(Feature),] %>% dplyr::select(Class, Genus)
+PC3_num_df = tax_filt[feat_ord %>% arrange(desc(PC3)) %>% slice(1:perc_10) %>% pull(Feature),] %>% dplyr::select(Class, Genus)
+
+bind_rows(
+  feat_ord %>% arrange(desc(PC2)) %>% slice(1:perc_10) %>% mutate(Ranking = paste0("Numerator: ", 1:8)) %>%
+    dplyr::select(Ranking, PC2, Class, Genus),
+  feat_ord %>% arrange((PC2)) %>% slice(1:perc_10) %>% mutate(Ranking = paste0("Denominator: ", 1:8)) %>%
+    dplyr::select(Ranking, PC2, Class, Genus)) %>% write.csv(paste0(FMT_dir, "Table1.csv"))
+```
+## Displaying RPCA results (Note that the final figure was generated in PRISM)
+Equivalent plot to Figure 2A (which was generated in PRISM)
+``` {r}
+ggplot(subj_ord, aes(x=PC2, y=PC3, shape=Label, color=Label)) + geom_point() 
+```
+Equivalent plot to Figure 2B (which was generated in PRISM)
+``` {r}
+ggplot(subj_ord, aes(x=Label, y=PC2, fill=Label)) + geom_boxplot() + geom_point() + facet_grid(.~Timepoint) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + stat_compare_means(comparisons = list(c("FMTCTRL", "FMTABX"), c("FMTABX", "FMTPBS")))
+```
+Equivalent plot to Figure 2B (which was generated in PRISM)
+``` {r}
+ggplot(subj_ord, aes(x=Label, y=PC2_10perc, fill=Label)) + geom_boxplot() + 
+            geom_point() + facet_grid(.~Timepoint) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("PC 2log ratio: top/bottom 10 features") +
+            stat_compare_means(comparisons = list(c("FMTCTRL", "FMTABX"),
+                                                  c("FMTCTRL", "FMTPBS"),
+                                                  c("FMTPBS", "FMTABX")))
+```
+
+

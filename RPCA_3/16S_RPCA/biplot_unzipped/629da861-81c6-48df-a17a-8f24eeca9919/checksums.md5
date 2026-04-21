@@ -1,0 +1,11 @@
+85ca400fe51af9841f8560aad836831e  VERSION
+8f0d347528bd8dc3a7dc44224ef6d01c  metadata.yaml
+28eb85abe34d96e49fe94ff785334e3d  data/ordination.txt
+85ca400fe51af9841f8560aad836831e  provenance/VERSION
+d42f80c46fbf85552645b3c987c2c141  provenance/citations.bib
+8f0d347528bd8dc3a7dc44224ef6d01c  provenance/metadata.yaml
+274d03ef3626ea79c748b89c58ea7385  provenance/action/action.yaml
+85ca400fe51af9841f8560aad836831e  provenance/artifacts/5d70d495-32ff-46e8-92b3-c07f237df82d/VERSION
+a46384d781ea198b224a65d164c69dbb  provenance/artifacts/5d70d495-32ff-46e8-92b3-c07f237df82d/citations.bib
+fdcba234d4652e548c6f571aef29f3ce  provenance/artifacts/5d70d495-32ff-46e8-92b3-c07f237df82d/metadata.yaml
+472b34b42d085e5a50e76c185fa868f6  provenance/artifacts/5d70d495-32ff-46e8-92b3-c07f237df82d/action/action.yaml
