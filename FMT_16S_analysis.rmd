@@ -224,6 +224,7 @@ ggexport(alpha_div_plot,
          dpi = 300, width = 600, height = 400, filename = paste0(FMT_figpath, "diversity.png"))
 alpha_div_plot
 ```
+
 ## Beta diversity analysis
 Beta diversity calculations were performed on filtered relative abundance data
 ``` {r}
@@ -384,58 +385,6 @@ ggexport(ggarrange(jaccard_donor_prism_plot, jaccard_donor_prism_plot2),
          dpi = 300, width = 500, height = 400, filename = paste0(FMT_figpath, "Donor_comparison.png"))
 ```
 
-## ANCOMBC2 analysis
-Main analysis (Results used to construct Figure 2D in PRISM)
-``` {r}
-set.seed(123)
-res_label_24_genus <- ancombc2(data = subset_samples(subset_samples(FMT_physeq_filtered_counts, Label %in% c("FMTABX", "FMTCTRL", "FMTPBS")), Timepoint ==24),
-                          tax_level = "Genus",
-                          fix_formula = "Label",
-                          rand_formula = NULL,
-                          p_adj_method = "holm", pseudo_sens = TRUE,
-                          prv_cut = 0, lib_cut = 0, s0_perc = 0.05,
-                          group = "Label", struc_zero = TRUE, neg_lb = FALSE,
-                          alpha = 0.05, n_cl = 2, verbose = TRUE,
-                          global = TRUE, pairwise = TRUE, dunnet = TRUE, trend = FALSE,
-                          iter_control = list(tol = 1e-2, max_iter = 20, 
-                                              verbose = TRUE),
-                          em_control = list(tol = 1e-5, max_iter = 100),
-                          lme_control = NULL,
-                          mdfdr_control = list(fwer_ctrl_method = "holm", B = 100),
-                          trend_control = NULL)
-res_24_genus = res_label_24_genus$res_pair
-
-ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))),
-       aes(y=taxon, x=lfc_LabelFMTCTRL, fill = diff_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTCTRL vs. FMTABX") + labs(fill="Significance")
-
-ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS) %>% pull(taxon)))),
-       aes(y=taxon, x=lfc_LabelFMTPBS, fill = diff_LabelFMTPBS)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTABX ") + labs(fill="Significance")
-
-ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS_LabelFMTCTRL) %>% pull(taxon)))),
-       aes(y=taxon, x=lfc_LabelFMTPBS_LabelFMTCTRL, fill = diff_LabelFMTPBS_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTCTRL") + labs(fill="Significance")
-
-res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL)
-
-res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL, q_LabelFMTCTRL) %>% filter(p_LabelFMTCTRL < 0.05)
-
-res_24_genus %>% 
-  mutate(fold_change = exp(lfc_LabelFMTCTRL), log_fold_change = log(fold_change, base = exp(1))) %>%
-  dplyr::select(taxon, fold_change, log_fold_change) %>% 
-  write.csv(paste0(FMT_dir, "fold_change_values.csv"))
-
-```
-
-Additional analysis: To evaluate the hypothesis that the Roseburia enrichment in the FMT-ABX group was already present at day 14, we leveraged ANCOMBC2 analysis for Day 14 data and found that Roseburia was already enriched in FMT-ABX vs. FMT-HD prior to FMT treatment (p=0.032).
-``` {r}
-genus_meta_df = otu_table(FMT_genus) %>% t() %>% data.frame() %>% tibble::rownames_to_column("Sample") %>%
-  left_join(meta)
-Roseburia = FMT_physeq_filtered_counts %>% tax_table ()%>% as.data.frame() %>% filter(Genus=="Roseburia") %>% rownames()
-
-ggplot(genus_meta_df %>% filter(Timepoint==14, Label %in% c("FMTABX", "FMTCTRL")), aes(x=Label, y=!!sym(Roseburia))) + geom_boxplot() + facet_grid(.~Timepoint) +
-  stat_compare_means(comparisons = list(c("FMTABX", "FMTCTRL"))) + ylab("Roseburia")
-
-```
-
 ## Data processing for RPCA analysis
 Loaded physeq data is processed for analysis via FMT_RPCA.ipynb
 ``` {r}
@@ -509,21 +458,264 @@ bind_rows(
     dplyr::select(Ranking, PC2, Class, Genus)) %>% write.csv(paste0(FMT_dir, "Table1.csv"))
 ```
 ## Displaying RPCA results (Note that the final figure was generated in PRISM)
-Equivalent plot to Figure 2A (which was generated in PRISM)
+Figure 2A
 ``` {r}
-ggplot(subj_ord, aes(x=PC2, y=PC3, shape=Label, color=Label)) + geom_point() 
+Figure2A = ggplot(subj_ord, aes(x = PC2, y = PC3, shape = Label, color = Label)) +
+  geom_point(size = 3) +
+  scale_color_manual(
+    values = c("FMTABX" = three_colors[["FMT-ABX"]], "FMTCTRL" = three_colors[["FMT-HD"]], "FMTPBS" = three_colors[["PBS"]]),
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS")
+  ) +
+  scale_shape_manual(
+    values = c("FMTABX" = 15, "FMTCTRL" = 17, "FMTPBS" = 16),  # square, triangle, circle
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS")
+  ) +
+  scale_x_continuous(
+    limits = c(-0.6, 0.6),
+    breaks = seq(-0.6, 0.6, by = 0.2),
+    labels = scales::number_format(accuracy = 0.1)   
+  ) +
+  scale_y_continuous(
+    limits = c(-1.0, 1.0),
+    breaks = seq(-1.0, 1.0, by = 0.5)
+  ) +
+  labs(
+    x = "PC2",
+    y = "PC3",
+    color = NULL,
+    shape = NULL
+  ) +
+  theme_prism(base_size = 12, base_fontface = "bold") +
+  theme(
+    legend.position    = c(0.85, 0.85),      # top-right inside plot
+    legend.background  = element_blank(),
+    legend.key         = element_blank(),
+    panel.grid         = element_blank()
+  )
+Figure2A
+ggexport(Figure2A, filename = paste0(FMT_figpath, "Figure2A.png"), width=400, height=300)
 ```
-Equivalent plot to Figure 2B (which was generated in PRISM)
+Figure 2B
 ``` {r}
-ggplot(subj_ord, aes(x=Label, y=PC2, fill=Label)) + geom_boxplot() + geom_point() + facet_grid(.~Timepoint) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + stat_compare_means(comparisons = list(c("FMTCTRL", "FMTABX"), c("FMTABX", "FMTPBS")))
+Figure2B = ggplot(subj_ord, aes(x = Label, y = PC2, fill = Label, color = Label)) +
+  geom_boxplot(
+    fill  = "white",                         
+    width = 0.5,
+    outlier.shape = NA                         
+  ) +
+  geom_point(
+    position = position_jitter(width = 0.1),
+    size = 2
+  ) +
+  geom_hline(yintercept = 0, linetype = "dotted", linewidth = 0.6) +
+  stat_compare_means(
+    comparisons = list(c("FMTCTRL", "FMTABX"), c("FMTABX", "FMTPBS")),
+    label = "p.signif",                       
+    bracket.size = 0.75, tip.length = 0,
+  ) +
+  scale_fill_manual(
+    values = c("FMTABX" = three_colors[["FMT-ABX"]], "FMTCTRL" = three_colors[["FMT-HD"]], "FMTPBS" = three_colors[["PBS"]]),
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS"),
+    breaks = c("FMTPBS", "FMTABX", "FMTCTRL")
+  ) +
+  scale_color_manual(
+    values = c("FMTABX" = three_colors[["FMT-ABX"]], "FMTCTRL" = three_colors[["FMT-HD"]], "FMTPBS" = three_colors[["PBS"]]),
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS"),
+    breaks = c("FMTPBS", "FMTABX", "FMTCTRL")
+  ) +
+  scale_x_discrete(
+    limits = c("FMTPBS", "FMTABX", "FMTCTRL"),   
+    labels = c("FMTPBS" = "PBS", "FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD"),
+  ) +
+  scale_y_continuous(
+    limits = c(-0.6, 0.6),
+    breaks = seq(-0.6, 0.6, by = 0.2),
+    labels = scales::number_format(accuracy = 0.1)   
+  ) +
+  labs(x = "Label", y = "PC2", fill = NULL, color = NULL) +
+  theme_prism(base_size = 12, base_fontface = "bold") +
+  theme(
+    legend.position   = "none",               
+    panel.grid        = element_blank(),
+    axis.text.x       = element_text(angle = 45, hjust = 1, vjust = 1)
+  )
+Figure2B
+ggexport(Figure2B, filename = paste0(FMT_figpath, "Figure2B.png"), width=200, height=300)
 ```
-Equivalent plot to Figure 2B (which was generated in PRISM)
+Figure 2C
 ``` {r}
-ggplot(subj_ord, aes(x=Label, y=PC2_10perc, fill=Label)) + geom_boxplot() + 
-            geom_point() + facet_grid(.~Timepoint) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("PC 2log ratio: top/bottom 10 features") +
-            stat_compare_means(comparisons = list(c("FMTCTRL", "FMTABX"),
-                                                  c("FMTCTRL", "FMTPBS"),
-                                                  c("FMTPBS", "FMTABX")))
+Figure2C = ggplot(subj_ord, aes(x = Label, y = PC2_10perc, fill = Label, color = Label)) +
+  geom_boxplot(
+    fill  = "white",
+    width = 0.5,
+    outlier.shape = NA
+  ) +
+  geom_point(
+    position = position_jitter(width = 0.1),
+    size = 2
+  ) +
+  geom_hline(yintercept = 0, linetype = "dotted", linewidth = 0.6) +
+  stat_compare_means(
+    comparisons = list(c("FMTCTRL", "FMTABX"),
+                       c("FMTCTRL", "FMTPBS"),
+                       c("FMTPBS",  "FMTABX")),
+    label        = "p.signif",
+    bracket.size = 0.75,
+    tip.length   = 0
+  ) +
+  scale_fill_manual(
+    values = c("FMTABX" = three_colors[["FMT-ABX"]], "FMTCTRL" = three_colors[["FMT-HD"]], "FMTPBS" = three_colors[["PBS"]]),
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS"),
+    breaks = c("FMTPBS", "FMTABX", "FMTCTRL")
+  ) +
+  scale_color_manual(
+    values = c("FMTABX" = three_colors[["FMT-ABX"]], "FMTCTRL" = three_colors[["FMT-HD"]], "FMTPBS" = three_colors[["PBS"]]),
+    labels = c("FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD", "FMTPBS" = "PBS"),
+    breaks = c("FMTPBS", "FMTABX", "FMTCTRL")
+  ) +
+  scale_x_discrete(
+    limits = c("FMTPBS", "FMTABX", "FMTCTRL"),
+    labels = c("FMTPBS" = "PBS", "FMTABX" = "FMT-ABX", "FMTCTRL" = "FMT-HD")
+  ) +
+  labs(
+    x     = "Label",
+    y     = "Log(Top PC2 Ranks:Bottom PC2 Ranks)",
+    fill  = NULL,
+    color = NULL
+  ) +
+  theme_prism(base_size = 12, base_fontface = "bold") +
+  theme(
+    legend.position = "none",
+    panel.grid      = element_blank(),
+    axis.text.x     = element_text(angle = 45, hjust = 1, vjust = 1)
+  )
+Figure2C
+ggexport(Figure2C, filename = paste0(FMT_figpath, "Figure2C.png"), width=200, height=300)
+```
+
+## ANCOMBC2 analysis
+Main analysis (Results used to construct Figure 2D in PRISM)
+``` {r}
+set.seed(123)
+res_label_24_genus <- ancombc2(data = subset_samples(subset_samples(FMT_physeq_filtered_counts, Label %in% c("FMTABX", "FMTCTRL", "FMTPBS")), Timepoint ==24),
+                          tax_level = "Genus",
+                          fix_formula = "Label",
+                          rand_formula = NULL,
+                          p_adj_method = "holm", pseudo_sens = TRUE,
+                          prv_cut = 0, lib_cut = 0, s0_perc = 0.05,
+                          group = "Label", struc_zero = TRUE, neg_lb = FALSE,
+                          alpha = 0.05, n_cl = 2, verbose = TRUE,
+                          global = TRUE, pairwise = TRUE, dunnet = TRUE, trend = FALSE,
+                          iter_control = list(tol = 1e-2, max_iter = 20, 
+                                              verbose = TRUE),
+                          em_control = list(tol = 1e-5, max_iter = 100),
+                          lme_control = NULL,
+                          mdfdr_control = list(fwer_ctrl_method = "holm", B = 100),
+                          trend_control = NULL)
+res_24_genus = res_label_24_genus$res_pair
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTCTRL, fill = diff_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTCTRL vs. FMTABX") + labs(fill="Significance")
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTPBS, fill = diff_LabelFMTPBS)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTABX ") + labs(fill="Significance")
+
+ggplot(res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTPBS_LabelFMTCTRL) %>% pull(taxon)))),
+       aes(y=taxon, x=lfc_LabelFMTPBS_LabelFMTCTRL, fill = diff_LabelFMTPBS_LabelFMTCTRL)) + geom_bar(stat="identity") + ylab("Genus") + xlab("log fold change FMTPBS vs. FMTCTRL") + labs(fill="Significance")
+
+res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL)
+
+res_24_genus %>% mutate(taxon = factor(res_24_genus$taxon, levels = (res_24_genus %>% arrange(lfc_LabelFMTCTRL) %>% pull(taxon)))) %>% dplyr::select(taxon,lfc_LabelFMTCTRL, p_LabelFMTCTRL, q_LabelFMTCTRL) %>% filter(p_LabelFMTCTRL < 0.05)
+
+res_24_genus %>% 
+  mutate(fold_change = exp(lfc_LabelFMTCTRL), log_fold_change = log(fold_change, base = exp(1))) %>%
+  dplyr::select(taxon, fold_change, log_fold_change) %>% 
+  write.csv(paste0(FMT_dir, "fold_change_values.csv"))
+
+```
+
+``` {r}
+# Prepare data with significance stars
+res_24_genus_plot_df = res_24_genus %>%
+  mutate(
+    taxon = factor(taxon, levels = (res_24_genus %>% 
+                     arrange(lfc_LabelFMTCTRL) %>% 
+                     pull(taxon))),
+    # Direction for color (negative = red, positive = green)
+    direction = ifelse(lfc_LabelFMTCTRL < 0, "neg", "pos"),
+    # Significance determines fill vs outline
+    sig = diff_LabelFMTCTRL,
+    # Star labels for significant taxa
+    stars = case_when(
+      q_LabelFMTCTRL < 0.001 ~ "***",
+      q_LabelFMTCTRL < 0.01  ~ "**",
+      q_LabelFMTCTRL < 0.05  ~ "*",
+      TRUE ~ ""
+    )
+  ) %>%
+  arrange(desc(lfc_LabelFMTCTRL)) 
+
+Figure2C = ggplot(res_24_genus_plot_df, aes(y = taxon, x = lfc_LabelFMTCTRL)) +
+  # Outlined (non-significant) bars
+  geom_bar(data = filter(res_24_genus_plot_df, !sig),
+           stat = "identity",
+           fill = "white",
+           color = NA,
+           alpha = 0.15) +
+  # Filled (significant) bars
+  geom_bar(data = filter(res_24_genus_plot_df, sig),
+           stat = "identity",
+           aes(fill = direction),
+           color = NA,
+           alpha = 1) +
+  # Outline for all bars
+  geom_bar(stat = "identity",
+           aes(color = direction),
+           fill = NA,
+           linewidth = 0.4) +
+  # Vertical line at 0
+  geom_vline(xintercept = 0, linewidth = 0.8, color = "black") +
+  scale_y_discrete(limits = levels(res_24_genus_plot_df$taxon)) + 
+  # Significance stars — placed just beyond bar end
+  geom_text(aes(
+    x = lfc_LabelFMTCTRL + ifelse(lfc_LabelFMTCTRL >= 0, 0.15, -0.15),
+    label = stars,
+    hjust = ifelse(lfc_LabelFMTCTRL >= 0, 0, 1)
+  ), size = 3.5) +
+  # Tick marks at bar ends for significant taxa (mimics prism style)
+  geom_segment(data = filter(res_24_genus_plot_df, sig),
+               aes(x = lfc_LabelFMTCTRL,
+                   xend = lfc_LabelFMTCTRL,
+                   y = as.numeric(taxon) - 0.45,
+                   yend = as.numeric(taxon) + 0.45),
+               color = "black", linewidth = 0.5) +
+  # Colors: red for negative, green for positive
+  scale_fill_manual(values  = c("neg" = three_colors[["FMT-ABX"]], "pos" = three_colors[["FMT-HD"]])) +
+  scale_color_manual(values = c("neg" = three_colors[["FMT-ABX"]], "pos" = three_colors[["FMT-HD"]])) +
+  # Prism theme
+  theme_prism(base_size = 11, base_fontface = "bold") +
+  theme(
+    legend.position = "none",
+    axis.line.y     = element_blank(),   # remove y-axis line (prism style)
+    panel.grid      = element_blank()
+  ) +
+  labs(
+    y = "Genus",
+    x = "Log-fold Difference\n(FMTCTRL vs. FMTABX)"
+  )
+Figure2C
+ggexport(Figure2C, filename = paste0(FMT_figpath, "Figure2D.png"), width = 500, height = 500)
+```
+
+Additional analysis: To evaluate the hypothesis that the Roseburia enrichment in the FMT-ABX group was already present at day 14, we leveraged ANCOMBC2 analysis for Day 14 data and found that Roseburia was already enriched in FMT-ABX vs. FMT-HD prior to FMT treatment (p=0.032).
+``` {r}
+genus_meta_df = otu_table(FMT_genus) %>% t() %>% data.frame() %>% tibble::rownames_to_column("Sample") %>%
+  left_join(meta)
+Roseburia = FMT_physeq_filtered_counts %>% tax_table ()%>% as.data.frame() %>% filter(Genus=="Roseburia") %>% rownames()
+
+ggplot(genus_meta_df %>% filter(Timepoint==14, Label %in% c("FMTABX", "FMTCTRL")), aes(x=Label, y=!!sym(Roseburia))) + geom_boxplot() + facet_grid(.~Timepoint) +
+  stat_compare_means(comparisons = list(c("FMTABX", "FMTCTRL"))) + ylab("Roseburia")
+
 ```
 
 
