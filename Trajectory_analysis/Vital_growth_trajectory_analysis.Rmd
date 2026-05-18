@@ -1,0 +1,249 @@
+---
+title: "Vital growth trajectory analysis"
+author: "April Jauhal"
+date: "2024-05-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Setting to overwrite existing files within document; does not apply to gbmt RDS files which must be deleted manually to overwrite
+``` {r}
+vital_traj_overwrite=FALSE
+```
+
+Loading libraries
+``` {r}
+library(ggplot2)
+library(ggpubr)
+library(gbmt)
+library(tidyverse)
+```
+
+Loading data and setting paths 
+``` {r}
+IMiC_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/"
+growth_tab <- read.csv(paste0(IMiC_path, "IMiC/Data/Berkeley_anthropometrics_dataset/imic_all_growth_measures_combined.csv"), row.names = 1)
+vital_traj_RDS_path <- paste0(IMiC_path, "IMiC/Data/VITAL/data/RDS/") # create path before running!
+vital_traj_key_path <- paste0(IMiC_path, "IMiC/Data/VITAL/metadata/vital_processed_traj_key.csv")
+vital_traj_growth_path <- paste0(IMiC_path, "IMiC/Data/VITAL/metadata/vital_processed_traj_growth.csv")
+vital_metadata <- read.delim(paste0(IMiC_path, "IMiC/Data/VITAL/metadata/VITAL_Lactation_IMiC_analysis (2).csv"), sep=",")
+vital_supp_metadata_path <- paste0(IMiC_path, "IMiC/Data/VITAL/metadata/vital_metadata_supp.csv")
+fig_path <- paste0(IMiC_path, "IMiC/Figures")
+```
+
+Defining functions
+``` {r}
+run_gbmt <- function (ngroups, dim, metric, df, traj_RDS_path) {
+  # inputs num groups, dimensions, metric (eg. "WAZ"), and df (likely growth_df)
+  # returns gbmt results object, either runs or recovers from RDS file
+  # Assumes "traj_RDS_path" defined at the top of the script contains the RDS folders
+  # No scaling procedure is run (which makes sense if using z-scores as inputs)
+  RDS_name=paste0("m", ngroups, "_", dim, ".RDS")
+  WAZ_RDS_path <- paste0(gsub("/$", "", traj_RDS_path), "/", metric, "/")
+  rdsfile=paste0(WAZ_RDS_path, RDS_name)
+  if (file.exists(dirname(rdsfile))) {
+    if (!file.exists(rdsfile)) {
+      gbmt_res <- gbmt(x.names=metric, unit="SUBJIDO", time="AGEDAYS", d=dim, ng=ngroups, data=df, scaling=0)
+      saveRDS(gbmt_res, rdsfile)
+      print("new save file written")
+    } else {print("save file exists")}
+    return(readRDS(rdsfile))
+  } else {print(paste0("ERROR: check/create filepath: ", dirname(file)))}
+}
+
+bic_calculate <- function(model_val, df) {
+  return(-2*model_val$logLik+model_val$npar*log(nrow(df)))
+}
+
+bic_compare <- function(bic_list) {
+  # Takes a list input (names=varname, value=value) of BIC values, tests based on < -2 BIC diff threshold
+  # Performs pairwise comparisons and returns the single best BIC as a named list
+  print("always double check that list components are increasing in complexity")
+  diff_vector <- c(names(bic_list)[1])
+  for (n in 1:(length(bic_list)-1)) {
+    diff <- as.numeric(bic_list[[(n+1)]]) - as.numeric(bic_list[[n]])
+    print(paste0(names(bic_list)[(n+1)], "-", names(bic_list)[(n)], ": ", diff))
+    if (diff < -2) {
+      diff_vector[length(diff_vector)+1] <- names(bic_list)[n+1]
+    }
+  }
+  retval <- list(bic_list[[length(diff_vector)]])
+  names(retval) <- names(bic_list)[length(diff_vector)]
+  print(paste0("best model: ", names(retval)))
+  return(retval)
+}
+```
+# Trajectory analysis
+Extracting 6 month growth data
+``` {r}
+vital_growth_tab <- growth_tab %>% dplyr::filter(STUDYID=="VITAL-Lactation",
+                                          as.numeric(AGEDAYS)<=183,
+                                          WAZ!="NA",
+                                          str_detect(VISIT, 'month|Baseline'),
+                                          !str_detect(VISIT, '\\.')
+                                          )
+vital_growth_tab
+``` 
+Group-based trajectory modeling
+``` {r Calculating WAZ trajectories}
+
+# Dimension 1
+WAZm1_1 <- run_gbmt(ngroups=1, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm2_1 <- run_gbmt(ngroups=2, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm3_1 <- run_gbmt(ngroups=3, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm4_1 <- run_gbmt(ngroups=4, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm5_1 <- run_gbmt(ngroups=5, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm6_1 <- run_gbmt(ngroups=6, dim=1, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path) 
+
+# Dimension 2
+WAZm1_2 <- run_gbmt(ngroups=1, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm2_2 <- run_gbmt(ngroups=2, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm3_2 <- run_gbmt(ngroups=3, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm4_2 <- run_gbmt(ngroups=4, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm5_2 <- run_gbmt(ngroups=5, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm6_2 <- run_gbmt(ngroups=6, dim=2, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+
+# Dimension 3
+WAZm1_3 <- run_gbmt(ngroups=1, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm2_3 <- run_gbmt(ngroups=2, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm3_3 <- run_gbmt(ngroups=3, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm4_3 <- run_gbmt(ngroups=4, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm5_3 <- run_gbmt(ngroups=5, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm6_3 <- run_gbmt(ngroups=6, dim=3, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+
+# Dimension 4
+WAZm1_4 <- run_gbmt(ngroups=1, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm2_4 <- run_gbmt(ngroups=2, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm3_4 <- run_gbmt(ngroups=3, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm4_4 <- run_gbmt(ngroups=4, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm5_4 <- run_gbmt(ngroups=5, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm6_4 <- run_gbmt(ngroups=6, dim=4, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+
+# Dimension 5
+WAZm1_5 <- run_gbmt(ngroups=1, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm2_5 <- run_gbmt(ngroups=2, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm3_5 <- run_gbmt(ngroups=3, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm4_5 <- run_gbmt(ngroups=4, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm5_5 <- run_gbmt(ngroups=5, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+WAZm6_5 <- run_gbmt(ngroups=6, dim=5, metric="WAZ", df=vital_growth_tab, traj_RDS_path=vital_traj_RDS_path)
+
+```
+Comparing 1 dimensional models
+``` {r}
+WAZ_dim1_best <- bic_compare(list(WAZ_BIC_1_1=bic_calculate(WAZm1_1, vital_growth_tab), 
+                                  WAZ_BIC_2_1=bic_calculate(WAZm2_1, vital_growth_tab), 
+                                  WAZ_BIC_3_1=bic_calculate(WAZm3_1, vital_growth_tab), 
+                                  WAZ_BIC_4_1=bic_calculate(WAZm4_1, vital_growth_tab), 
+                                  WAZ_BIC_5_1=bic_calculate(WAZm5_1, vital_growth_tab), 
+                                  WAZ_BIC_6_1=bic_calculate(WAZm6_1, vital_growth_tab)))
+
+print(WAZ_dim1_best)
+```
+Comparing 2 dimensional models
+```{r}
+WAZ_dim2_best <- bic_compare(list(WAZ_BIC_1_2=bic_calculate(WAZm1_2, vital_growth_tab), 
+                                  WAZ_BIC_2_2=bic_calculate(WAZm2_2, vital_growth_tab), 
+                                  WAZ_BIC_3_2=bic_calculate(WAZm3_2, vital_growth_tab), 
+                                  WAZ_BIC_4_2=bic_calculate(WAZm4_2, vital_growth_tab), 
+                                  WAZ_BIC_5_2=bic_calculate(WAZm5_2, vital_growth_tab), 
+                                  WAZ_BIC_6_2=bic_calculate(WAZm6_2, vital_growth_tab)))
+print(WAZ_dim2_best)
+```
+Comparing 3 dimensional models
+```{r}
+WAZ_dim3_best <- bic_compare(list(WAZ_BIC_1_3=bic_calculate(WAZm1_3, vital_growth_tab), 
+                                  WAZ_BIC_2_3=bic_calculate(WAZm2_3, vital_growth_tab), 
+                                  WAZ_BIC_3_3=bic_calculate(WAZm3_3, vital_growth_tab), 
+                                  WAZ_BIC_4_3=bic_calculate(WAZm4_3, vital_growth_tab), 
+                                  WAZ_BIC_5_3=bic_calculate(WAZm5_3, vital_growth_tab), 
+                                  WAZ_BIC_6_3=bic_calculate(WAZm6_3, vital_growth_tab)))
+print(WAZ_dim3_best) 
+```
+Comparing 4 dimensional models
+``` {r}
+WAZ_dim4_best <- bic_compare(list(WAZ_BIC_1_4=bic_calculate(WAZm1_4, vital_growth_tab), 
+                                  WAZ_BIC_2_4=bic_calculate(WAZm2_4, vital_growth_tab), 
+                                  WAZ_BIC_3_4=bic_calculate(WAZm3_4, vital_growth_tab), 
+                                  WAZ_BIC_4_4=bic_calculate(WAZm4_4, vital_growth_tab), 
+                                  WAZ_BIC_5_4=bic_calculate(WAZm5_4, vital_growth_tab), 
+                                  WAZ_BIC_6_4=bic_calculate(WAZm6_4, vital_growth_tab)))
+print(WAZ_dim4_best) 
+```
+Comparing 5 dimensional models
+``` {r}
+WAZ_dim5_best <- bic_compare(list(WAZ_BIC_1_5=bic_calculate(WAZm1_5, vital_growth_tab), 
+                                  WAZ_BIC_2_5=bic_calculate(WAZm2_5, vital_growth_tab), 
+                                  WAZ_BIC_3_5=bic_calculate(WAZm3_5, vital_growth_tab), 
+                                  WAZ_BIC_4_5=bic_calculate(WAZm4_5, vital_growth_tab), 
+                                  WAZ_BIC_5_5=bic_calculate(WAZm5_5, vital_growth_tab), 
+                                  WAZ_BIC_6_5=bic_calculate(WAZm6_5, vital_growth_tab)))
+print(WAZ_dim5_best) 
+```
+Final model comparison
+``` {r}
+bic_compare(c(WAZ_dim1_best, WAZ_dim2_best, WAZ_dim3_best, WAZ_dim4_best, WAZ_dim5_best))
+
+# The 4-dimensional model provided the most biologically coherent stratification of longitudinal growth trajectories
+WAZ_best_model <- WAZ_dim4_best
+WAZ_group_list <- get(str_replace(names(WAZ_best_model), "_BIC_", "m"))$assign.list
+
+WAZ_group_assignment <- vector()
+for (each_infant in vital_growth_tab$SUBJIDO){
+  for (WAZ_group_num in names(WAZ_group_list)) {
+    if (each_infant %in% WAZ_group_list[[WAZ_group_num]]) {
+      WAZ_group_assignment <- c(WAZ_group_assignment, WAZ_group_num)
+    }
+  }
+}
+vital_growth_tab$WAZ_traj <- as.factor(WAZ_group_assignment)
+```
+Adding labels
+``` {r}
+milk_metadata_vital = vital_metadata %>% left_join(vital_growth_tab %>% dplyr::select(SUBJID, WAZ_traj) %>% unique(), by="SUBJID")
+
+growth_df2_vit = vital_growth_tab %>%
+         mutate(Month=AGEDAYS/30, 
+                WAZ_traj_cat = ifelse(WAZ_traj==1, "Stable1",
+                                      ifelse(WAZ_traj==2, "Stable4",
+                                             ifelse(WAZ_traj==3, "Stable2",
+                                                    ifelse(WAZ_traj==4, "Perturbed", 'Stable3')))),
+                WAZ_traj_cat = factor(WAZ_traj_cat, levels = c("Stable1", "Stable2", "Stable3", "Stable4", "Perturbed"))) %>%
+  dplyr::select(-HCAZ) %>%
+  left_join(milk_metadata_vital %>% dplyr::select(SUBJID, VISIT, ARM, SEXN, ARMCD, BMI, HCAZ))
+```
+# Saving trajectory key
+``` {r}
+vital_traj_key = growth_df2_vit %>% dplyr::rename(SubjectID=SUBJID) %>% dplyr::select(SubjectID, WAZ_traj, WAZ_traj_cat) %>% unique() 
+if (vital_traj_overwrite | !file.exists(vital_traj_key_path)) {
+  write.csv(vital_traj_key, file=vital_traj_key_path)
+}
+
+if (vital_traj_overwrite | !file.exists(vital_traj_growth_path)) {
+  write.csv(growth_df2_vit, file=vital_traj_growth_path)
+}
+```
+# Additional metadata calcuations
+Building supplementary metadata
+``` {r}
+vital_metadata <- read.delim(paste0(IMiC_path, "IMiC/Data/VITAL/metadata/VITAL_Lactation_IMiC_analysis.csv"), sep=',')
+
+vital_weight_diff_6mo_df <- left_join(vital_metadata, inner_join(
+  vital_metadata %>% filter(VISIT=="Baseline", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG) %>% dplyr::rename(wt_0=WTKG),
+  vital_metadata %>% filter(VISIT=="Follow up month 6", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG, AGEDAYS) %>% dplyr::rename(wt_6=WTKG, AGE=AGEDAYS))) %>%
+    mutate(delta_weight_6mo = wt_6-wt_0,
+           growth_vel_6mo=(1000*log(wt_6/wt_0))/AGE) # Patel exponential method
+
+vital_length_diff_6mo_df <- left_join(vital_metadata, inner_join(
+  vital_metadata %>% filter(VISIT=="Baseline", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM) %>% dplyr::rename(len_0=LENCM),
+  vital_metadata %>% filter(VISIT=="Follow up month 6", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM, AGEDAYS) %>% dplyr::rename(len_6=LENCM, AGE=AGEDAYS))) %>%
+    mutate(delta_length_6mo = len_6-len_0,   
+           length_vel_6mo=delta_length_6mo/(AGE/30.437))
+
+if (vital_traj_overwrite | !file.exists(vital_supp_metadata_path)) {
+  write.csv(vital_weight_diff_6mo_df %>% dplyr::select(SUBJIDO, growth_vel_6mo) %>% full_join(vital_length_diff_6mo_df %>% dplyr::select(SUBJIDO, length_vel_6mo)) %>% unique(), vital_supp_metadata_path)
+}
+```
+

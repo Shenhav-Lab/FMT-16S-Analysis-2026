@@ -23,13 +23,13 @@ source("plotting_functions.R")
 ```
 # Load additional data
 ``` {r}
-# Load Figure 4-specific data 
+# Load Figure 4-specific data
 enrichment_df_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/processed_tissue_enrichment.csv"
 enrichment_df = read.csv(enrichment_df_path, row.names = 1)
 enrichment_df_filt = enrichment_df %>% filter(p_val_perc_adjust < 0.05)
 Breast_glandular_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast glandular cells") %>% pull(Gene.name)
 Breast_myoepitheilal_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast myoepithelial cells") %>% pull(Gene.name)
-Immune_cell_types = c("B-cells", "Hofbauer cells", "Macrophages", "monocytes", "dendritic cells", "NK-cells", "Plasma cells", "granulocytes", "Kupffer cells", "Langerhans cells", "T-cells") 
+Immune_cell_types = c("B-cells", "Hofbauer cells", "Macrophages", "monocytes", "dendritic cells", "NK-cells", "Plasma cells", "granulocytes", "Kupffer cells", "Langerhans cells", "T-cells")
 Immune_expr_genes = enrichment_df_filt %>% filter(Top_cell_type %in% Immune_cell_types) %>% pull(Gene.name)
 IG_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/protein_class_Immunoglobulin.tsv") %>% pull(Gene)
 blood_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_blood.tsv") %>% pull(Gene)
@@ -37,17 +37,21 @@ female_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/
 ECM_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_ECM.tsv") %>% pull(Gene)
 Tissue_atlas = read.delim("C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/MOMI/Metabolomics_working_dir/Data/Tissue_Atlas/rna_single_cell_type.tsv")
 ```
-#Figure 6SA
+# Figure S6A
 ``` {r}
-# Set metabolites
-MG_heatmap_key = list("Sia"="Sialylated HMOs",
-                        "Se"="Selenium",
-                        "C5" = "Valerylcarnitine (C5)",
-                        "C4" = "Butyrylcarnitine (C4)",
-                        "C3" = "Propionylcarnitine (C3)",
-                        "X6.SL" = "6'-Sialyllactose",
-                        "Lys" = "Lysine")
+# Establish metablolite set
+MG_heatmap_key = list("Na_K_Ratio" = "Na:K Ratio",
+                      "Se"="Selenium",
+                      "C5" = "Valerylcarnitine (C5)",
+                      "C4" = "Butyrylcarnitine (C4)",
+                      "C3" = "Propionylcarnitine (C3)",
+                      "C2" = "Acetylcarnitine (C2)",
+                      "Lys" = "Lysine",
+                      "Se" = "Selenium",
+                      "Na" = "Sodium",
+                      "X6.SL" = "6'-Sialyllactose")
 metab_feats = names(MG_heatmap_key)
+main_metab = c("C2","C3","C4","C5","Lys","Se","X6.SL", "Na", "Na_K_Ratio")
 
 # Identify ECM-specific genes for MISAME
 mis_ECM_focus_genes = ECM_secrete_genes[ECM_secrete_genes %in% colnames(misame_proteomics_filt_genes)]
@@ -93,7 +97,7 @@ for (label in labels) {
   for (context in ECM_contexts) {
     focus_genes <- ECM_focus_genes_map[[context]][[tolower(substr(label, 1, 3))]]
     ECM_heat_list[[paste(label, context)]] <- get_heatmap_correlations(
-      metab_feats = metab_feats,
+      metab_feats = main_metab,
       focus_genes = focus_genes,
       label = label,
       include_H1 = (context == "Milk")
@@ -113,6 +117,8 @@ Misame_ecm_matrix <- prepare_complete_heatmap_matrix(
   proteomics_df = misame_proteomics_filt_genes,
   everything_df = Misame_everything,
   MSD_df = Mis_MSD,
+  complex = FALSE
+  
 )
 Misame_ecm_Heatmap <- render_heatmap(
   matrix_r = Misame_ecm_matrix$r,
@@ -133,6 +139,7 @@ Vital_ecm_matrix <- prepare_complete_heatmap_matrix(
   proteomics_df = vital_proteomics_filt_genes,
   everything_df = Vital_everything,
   MSD_df = Vit_MSD,
+  complex = FALSE
 )
 Vital_ecm_Heatmap <- render_heatmap(
   matrix_r = Vital_ecm_matrix$r,
@@ -144,13 +151,10 @@ Vital_ecm_Heatmap <- render_heatmap(
 FigureS6A = ggarrange(as.ggplot(Misame_ecm_Heatmap), as.ggplot(Vital_ecm_Heatmap))
 FigureS6A
 
-ggexport(FigureS6A, 
+ggexport(FigureS6A,
          filename=paste0(fig_path, "/FigureS6A.pdf"),
-         width=10.2, height=6.2)
-
+         width=11, height=6.2)
 ```
-
-#Figure 6SB
 ``` {r}
 library(GO.db)
 
@@ -204,7 +208,7 @@ for (label in labels) {
   for (context in Dev_contexts) {
     focus_genes <- Dev_focus_genes_map[[context]][[tolower(substr(label, 1, 3))]]
     Dev_heat_list[[paste(label, context)]] <- get_heatmap_correlations(
-      metab_feats = metab_feats,
+      metab_feats = main_metab,
       focus_genes = focus_genes,
       label = label,
       include_H1 = (context == "Milk")
@@ -245,11 +249,11 @@ Vital_dev_Heatmap <- render_heatmap(
 )
 
 Figure6SB = ggarrange(as.ggplot(Misame_dev_Heatmap), as.ggplot(Vital_dev_Heatmap))
+Figure6SB
 ggexport(Figure6SB, 
          filename=paste0(fig_path, "/Figure6SB.pdf"),
          width=8.4, height=3)
 ```
-#Figure 6SC
 ``` {r}
 # Preparing data for plotting using all Immunoglobin genes
 mis_IG_focus_genes = IG_genes[IG_genes %in% colnames(misame_proteomics_filt_genes)]
@@ -265,7 +269,7 @@ for (label in labels) {
   for (context in Ig_contexts) {
     focus_genes <- Ig_focus_genes_map[[context]][[tolower(substr(label, 1, 3))]]
     Ig_heat_list[[paste(label, context)]] <- get_heatmap_correlations(
-      metab_feats = metab_feats,
+      metab_feats = main_metab,
       focus_genes = focus_genes,
       label = label,
       include_H1 = (context == "Milk")
@@ -306,6 +310,7 @@ Vital_Ig_Heatmap <- render_heatmap(
 )
 
 Figure6SC = ggarrange(as.ggplot(Misame_Ig_Heatmap), as.ggplot(Vital_Ig_Heatmap), widths = c(1.1,1))
+Figure6SC
 ggexport(Figure6SC, 
          filename=paste0(fig_path, "/Figure6SC.pdf"),
          width=8, height=9.6)

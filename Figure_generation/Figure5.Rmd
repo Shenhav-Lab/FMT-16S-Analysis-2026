@@ -26,19 +26,19 @@ source("plotting_functions.R")
 
 ## Figure 5A
 ``` {r}
-# Load Figure 4-specific data 
-enrichment_df_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/processed_tissue_enrichment.csv"
+# Load Figure-specific data 
+enrichment_df_path = paste0(IMiC_path, "Databases/Tissue_Atlas/processed_tissue_enrichment.csv")
 enrichment_df = read.csv(enrichment_df_path, row.names = 1)
 enrichment_df_filt = enrichment_df %>% filter(p_val_perc_adjust < 0.05)
 Breast_glandular_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast glandular cells") %>% pull(Gene.name)
 Breast_myoepitheilal_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast myoepithelial cells") %>% pull(Gene.name)
 Immune_cell_types = c("B-cells", "Hofbauer cells", "Macrophages", "monocytes", "dendritic cells", "NK-cells", "Plasma cells", "granulocytes", "Kupffer cells", "Langerhans cells", "T-cells") 
 Immune_expr_genes = enrichment_df_filt %>% filter(Top_cell_type %in% Immune_cell_types) %>% pull(Gene.name)
-IG_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/protein_class_Immunoglobulin.tsv") %>% pull(Gene)
-blood_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_blood.tsv") %>% pull(Gene)
-female_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_female-reproductive-system.tsv") %>% pull(Gene)
-ECM_secrete_genes = read.delim("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_ECM.tsv") %>% pull(Gene)
-Tissue_atlas = read.delim("C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/MOMI/Metabolomics_working_dir/Data/Tissue_Atlas/rna_single_cell_type.tsv")
+IG_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/protein_class_Immunoglobulin.tsv")) %>% pull(Gene)
+blood_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_blood.tsv")) %>% pull(Gene)
+female_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_female-reproductive-system.tsv")) %>% pull(Gene)
+ECM_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_ECM.tsv")) %>% pull(Gene)
+Tissue_atlas = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/rna_single_cell_type.tsv"))
 
 # Function to calculate proteomics correlation datasets for enrichment analysis and tabulation 
 get_proteomics_cor_lists = function(Misame_proteome_input, Vital_proteome_input, Feat) {
@@ -119,20 +119,23 @@ calc_all_enrichments <- function(cor_obj, label, params) {
                         cor_df = cor_list[[paste0(dataset, "_", direction)]],
                         source_prot_meta = meta_list[[dataset]]
                       )
-                    })
+                    }) 
     ) %>% pull(result) %>% bind_rows() %>% 
     mutate(Study = word(Label, 2), Feat = word(Label, 1), Direction = word(Label, 3))
 }
 
 
 # Set key for metabolites in correlation/enrichment analysis
-MG_heatmap_key = list("Sia"="Sialylated HMOs",
-                        "Se"="Selenium",
-                        "C5" = "Valerylcarnitine (C5)",
-                        "C4" = "Butyrylcarnitine (C4)",
-                        "C3" = "Propionylcarnitine (C3)",
-                        "X6.SL" = "6'-Sialyllactose",
-                        "Lys" = "Lysine")
+MG_heatmap_key = list("Na_K_Ratio" = "Na:K Ratio",
+                      "Se"="Selenium",
+                      "C5" = "Valerylcarnitine (C5)",
+                      "C4" = "Butyrylcarnitine (C4)",
+                      "C3" = "Propionylcarnitine (C3)",
+                      "C2" = "Acetylcarnitine (C2)",
+                      "Lys" = "Lysine",
+                      "Se" = "Selenium",
+                      "Na" = "Sodium",
+                      "X6.SL" = "6'-Sialyllactose")
 
 # Compute: enrichment and correlation analysis for metabolites in MG_heatmap_key
 params <- crossing(dataset = c("MISAME", "Mumta"),
@@ -161,22 +164,29 @@ count_corrs = function(feature, cor_list) {
 corr_count_table <- bind_rows(
   count_corrs("Lysine", prot_metab_cors[["Lys"]]),
   count_corrs("Selenium", prot_metab_cors[["Se"]]),
-  count_corrs("Siaylated HMOs", prot_metab_cors[["Sia"]]),
-  count_corrs("6'-Sialyllactose", prot_metab_cors[["X6.SL"]]),
+  count_corrs("Acetylcarnitine (C2)", prot_metab_cors[["C2"]]),
   count_corrs("Propionylcarnitine (C3)", prot_metab_cors[["C3"]]),
   count_corrs("Butyrylcarnitine (C4)", prot_metab_cors[["C4"]]),
-  count_corrs("Valerylcarnitine (C5)", prot_metab_cors[["C5"]])
+  count_corrs("Valerylcarnitine (C5)", prot_metab_cors[["C5"]]),
+  count_corrs("Sodium", prot_metab_cors[["Na"]]),
+  count_corrs("Na:K Ratio", prot_metab_cors[["Na_K_Ratio"]]),
+  count_corrs("6'-Sialyllactose", prot_metab_cors[["X6.SL"]])
 ) %>%
   mutate(Feat = factor(Feat,
-                       levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)",
-                                      "Propionylcarnitine (C3)", "Lysine",
-                                      "6'-Sialyllactose", "Siaylated HMOs", "Selenium"))))
+                       levels = rev(c("Acetylcarnitine (C2)", 
+                                      "Propionylcarnitine (C3)",
+                                      "Butyrylcarnitine (C4)", 
+                                      "Valerylcarnitine (C5)", 
+                                      "Lysine", "Selenium",
+                                      "6'-Sialyllactose", 
+                                      "Sodium", "Na:K Ratio"))))
 
 # Combine enrichment data 
 full_enrichments = bind_rows(prot_metab_enrichments[["Lys"]], prot_metab_enrichments[["Se"]], 
-                             prot_metab_enrichments[["Se"]], prot_metab_enrichments[["C5"]], 
-                             prot_metab_enrichments[["X6.SL"]], prot_metab_enrichments[["C4"]], 
-                             prot_metab_enrichments[["C3"]])
+                             prot_metab_enrichments[["C2"]], prot_metab_enrichments[["C5"]], 
+                             prot_metab_enrichments[["C4"]], prot_metab_enrichments[["C3"]], 
+                             prot_metab_enrichments[["Na"]], prot_metab_enrichments[["X6.SL"]],
+                             prot_metab_enrichments[["Na_K_Ratio"]])
 
 # Compute breast glandular cell enrichment 
 Glandular_enrich_df = full_enrichments %>% filter(Category=="Breast_glandular_expr_genes", Study %in% c("MISAME", "Mumta"), 
@@ -184,8 +194,13 @@ Glandular_enrich_df = full_enrichments %>% filter(Category=="Breast_glandular_ex
   mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),,
          Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
          Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
-                                     levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)", "Propionylcarnitine (C3)",
-                                                "Lysine", "6'-Sialyllactose", "Sialylated HMOs", "Selenium"))))
+                                     levels = rev(c("Acetylcarnitine (C2)", 
+                                                    "Propionylcarnitine (C3)",
+                                                    "Butyrylcarnitine (C4)", 
+                                                    "Valerylcarnitine (C5)", 
+                                                    "Lysine", "Selenium",
+                                                    "6'-Sialyllactose", 
+                                                    "Sodium", "Na:K Ratio"))))
 # plot breast glandular cell enrichment
 Glandular_enrich_plot = Glandular_enrich_df %>%
   ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
@@ -219,8 +234,13 @@ female_secrete_enrich_df = full_enrichments %>% filter(Category=="female_secrete
   mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),,
          Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
          Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
-                                     levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)", "Propionylcarnitine (C3)",
-                                                "Lysine", "6'-Sialyllactose", "Sialylated HMOs", "Selenium"))))
+                                     levels = rev(c("Acetylcarnitine (C2)", 
+                                                    "Propionylcarnitine (C3)",
+                                                    "Butyrylcarnitine (C4)", 
+                                                    "Valerylcarnitine (C5)", 
+                                                    "Lysine", "Selenium",
+                                                    "6'-Sialyllactose", 
+                                                    "Sodium", "Na:K Ratio"))))
 
 # Plot female secretion enrichemnt
 Female_secrete_enrich_plot = female_secrete_enrich_df %>%
@@ -254,8 +274,13 @@ ecm_secrete_enrich_df = full_enrichments %>% filter(Category=="ECM_secrete_genes
   mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
          Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
          Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
-                                     levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)", "Propionylcarnitine (C3)",
-                                                "Lysine", "6'-Sialyllactose", "Sialylated HMOs", "Selenium"))))
+                                     levels = rev(c("Acetylcarnitine (C2)", 
+                                                    "Propionylcarnitine (C3)",
+                                                    "Butyrylcarnitine (C4)", 
+                                                    "Valerylcarnitine (C5)", 
+                                                    "Lysine", "Selenium",
+                                                    "6'-Sialyllactose", 
+                                                    "Sodium", "Na:K Ratio"))))
 # Plot ECM enrichment
 ECM_secrete_enrich_plot = ecm_secrete_enrich_df %>%
   ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
@@ -266,13 +291,13 @@ ECM_secrete_enrich_plot = ecm_secrete_enrich_df %>%
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=0.2),
-                color = "white") +
+                color = "black") +
   geom_text(data = subset(ecm_secrete_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
             aes(x = 0, 
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=-0.25),
-                color = "white") + geom_vline(xintercept=0) + theme_minimal() +
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
   theme(axis.text.y = element_text(size = 10),
         axis.title.y = element_text(size = 12),
         axis.text.x = element_text(size = 10),
@@ -280,7 +305,7 @@ ECM_secrete_enrich_plot = ecm_secrete_enrich_df %>%
         ) + 
   labs( fill = "Study") +
   xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Proteins Secreted To ECM") +
-  scale_fill_manual(values = c("MISAME" = "#1F78B4", "Mumta-LW" = "#ff8c00"))
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
 
 # Compute immune cell enrichment
 immune_expr_enrich_df = full_enrichments %>% filter(Category=="Immune_expr_genes", Study %in% c("MISAME", "Mumta"), 
@@ -288,8 +313,13 @@ immune_expr_enrich_df = full_enrichments %>% filter(Category=="Immune_expr_genes
   mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
          Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
          Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
-                                     levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)", "Propionylcarnitine (C3)",
-                                                "Lysine", "6'-Sialyllactose", "Sialylated HMOs", "Selenium"))))
+                                     levels = rev(c("Acetylcarnitine (C2)", 
+                                                    "Propionylcarnitine (C3)",
+                                                    "Butyrylcarnitine (C4)", 
+                                                    "Valerylcarnitine (C5)", 
+                                                    "Lysine", "Selenium",
+                                                    "6'-Sialyllactose", 
+                                                    "Sodium", "Na:K Ratio"))))
 
 # Plot immune cell enrichment
 Immune_expr_enrich_plot = immune_expr_enrich_df %>%
@@ -301,13 +331,13 @@ Immune_expr_enrich_plot = immune_expr_enrich_df %>%
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=0.2),
-                color = "white") +
+                color = "black") +
   geom_text(data = subset(immune_expr_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
             aes(x = 0, 
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=-0.25),
-                color = "white") + geom_vline(xintercept=0) + theme_minimal() +
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
   theme(axis.text.y = element_text(size = 10),
         axis.title.y = element_text(size = 12),
         axis.text.x = element_text(size = 10),
@@ -315,7 +345,7 @@ Immune_expr_enrich_plot = immune_expr_enrich_df %>%
         ) + 
   labs( fill = "Study") +
   xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Immune Cell-Enriched Proteins") +
-  scale_fill_manual(values = c("MISAME" = "#1F78B4", "Mumta-LW" = "#ff8c00"))
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
 
 # Calculate immunoglobin enrichment
 Ig_enrich_df = full_enrichments %>% filter(Category=="IG_genes", Study %in% c("MISAME", "Mumta"), 
@@ -323,8 +353,13 @@ Ig_enrich_df = full_enrichments %>% filter(Category=="IG_genes", Study %in% c("M
   mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
          Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
          Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
-                                     levels = rev(c("Valerylcarnitine (C5)", "Butyrylcarnitine (C4)", "Propionylcarnitine (C3)",
-                                                "Lysine", "6'-Sialyllactose", "Sialylated HMOs", "Selenium"))))
+                                     levels = rev(c("Acetylcarnitine (C2)", 
+                                                    "Propionylcarnitine (C3)",
+                                                    "Butyrylcarnitine (C4)", 
+                                                    "Valerylcarnitine (C5)", 
+                                                    "Lysine", "Selenium",
+                                                    "6'-Sialyllactose", 
+                                                    "Sodium", "Na:K Ratio"))))
 
 # Plot immunoglobin enrichment
 IG_enrich_plot = Ig_enrich_df %>%
@@ -336,13 +371,13 @@ IG_enrich_plot = Ig_enrich_df %>%
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=0.2),
-                color = "white") +
+                color = "black") +
   geom_text(data = subset(Ig_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
             aes(x = 0, 
                 label = paste("p =", signif(as.numeric(p), 3)),
                 vjust = 0.35, hjust = -0.1),
                 position = position_nudge(y=-0.25),
-                color = "white") + geom_vline(xintercept=0) + theme_minimal() +
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
   theme(axis.text.y = element_text(size = 10),
         axis.title.y = element_text(size = 12),
         axis.text.x = element_text(size = 10),
@@ -350,7 +385,7 @@ IG_enrich_plot = Ig_enrich_df %>%
         ) + 
   labs( fill = "Study") +
   xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Immunoglobulin Proteins") +
-  scale_fill_manual(values = c("MISAME" = "#1F78B4", "Mumta-LW" = "#ff8c00"))
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
 
 # Combine Enrichment plots
 Enrich_plots = ggarrange(Glandular_enrich_plot, Female_secrete_enrich_plot, ECM_secrete_enrich_plot, Immune_expr_enrich_plot, IG_enrich_plot, nrow = 1)
@@ -384,15 +419,15 @@ pos_corr_count_df = corr_count_table %>% filter(Direction=="pos") %>%
         axis.title.x = element_text(size = 12),
         ) + 
   labs( fill = "Study") +
-  xlab("Total proteins") + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Significant Negative Protein Associations") +
-  scale_fill_manual(values = c("MISAME" = "#1F78B4", "Mumta-LW" = "#ff8c00")) 
+  xlab("Total proteins") + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Significant Positive Protein Associations") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB")) 
 
 Figure5A1 = ggarrange(pos_corr_count_df, ECM_secrete_enrich_plot, Immune_expr_enrich_plot, IG_enrich_plot, nrow = 1)
 Figure5A2 = ggarrange(neg_corr_count_df, Glandular_enrich_plot, Female_secrete_enrich_plot, nrow = 1)
 
-Figure5A1
-Figure5A2
+ggarrange(Figure5A2, Figure5A1, ncol = 1)
 
+fig_path <- "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures/NEW"
 ggexport(filename = paste0(fig_path, "/Figure5A1.pdf"), 
          plot = Figure5A1,
         width = 23.04, height = 4.5)
@@ -401,7 +436,7 @@ ggexport(filename = paste0(fig_path, "/Figure5A2.pdf"),
         width = 19.25, height = 4.5)
 ```
 
-## Figure 5B
+##Figure 5B
 ``` {r}
 # protein key 
 Protein_key_Misame = list("AGRN" = "Agrin",
@@ -414,8 +449,11 @@ Protein_key_Misame = list("AGRN" = "Agrin",
                    "CSN3" ="κ-casein",
                    "CSN1S1" = "α-S1-casein",
                    "CSN2"="β-Casein",
-                   "H1" = "Hexose (Lactose)"
-                   )
+                   "H1" = "Hexose",
+                   "Na_K_Ratio" = "Na:K",
+                   "Na" = "Sodium",
+                   "CHO" = "Total Carbohydrates",
+                   "Total_HMO" = "HMO Pool")
 Protein_key_Vital = list("AGRN" = "Agrin",
                    "IgA" = "IgA",
                    "COL3A1" = "Collagen",
@@ -426,11 +464,15 @@ Protein_key_Vital = list("AGRN" = "Agrin",
                    "CSN3" ="κ-casein",
                    "CSN1S1" = "α-S1-casein",
                    "CSN2"="β-Casein",
-                   "H1" = "Hexose (Lactose)")
+                   "H1" = "Hexose",
+                   "Na_K_Ratio" = "Na:K",
+                   "Na" = "Sodium",
+                   "CHO" = "Total Carbohydrates",
+                   "Total_HMO" = "HMO Pool")
 
 # Defining components to use for heatmap generation
 ECM_components = c('TNC', 'AGRN', 'PLOD3', 'COL4A2', 'COL3A1')
-main_metab = c('C3', 'C4', 'C5', 'Lys', 'Sia', 'X6.SL', 'Se')
+main_metab = c("C2","C3","C4","C5","Lys","Se","X6.SL", "Na", "Na_K_Ratio")
 immune_factors = c("Calprotectin", "IgA")
 mis_milk_focus_genes = misame_protein_meta %>% 
   filter(Gene.Name %in% Breast_glandular_expr_genes & Gene.Name %in% female_secrete_genes) %>% pull(Gene.Name) %>% sort()
@@ -457,19 +499,25 @@ for (label in labels) {
       metab_feats = main_metab,
       focus_genes = focus_genes,
       label = label,
-      include_H1 = (context == "Milk")
+      include_H1 = FALSE, #(context == "Milk"), # For reviewer figure
+      include_cho = (context == "Milk"),
+      include_hmo = FALSE #(context == "Milk") # For reviewer figure
     )
   }
 }
 
 # Generating combined heatmaps 
-MG_heatmap_key = list("Sia"="Sialylated HMOs",
-                        "Se"="Selenium",
-                        "C5" = "Valerylcarnitine (C5)",
-                        "C4" = "Butyrylcarnitine (C4)",
-                        "C3" = "Propionylcarnitine (C3)",
-                        "X6.SL" = "6'-Sialyllactose",
-                        "Lys" = "Lysine")
+MG_heatmap_key = list("Na_K_Ratio" = "Na:K Ratio",
+                      "Se"="Selenium",
+                      "C5" = "Valerylcarnitine (C5)",
+                      "C4" = "Butyrylcarnitine (C4)",
+                      "C3" = "Propionylcarnitine (C3)",
+                      "C2" = "Acetylcarnitine (C2)",
+                      "Lys" = "Lysine",
+                      "Se" = "Selenium",
+                      "Na" = "Sodium",
+                      "X6.SL" = "6'-Sialyllactose")
+
 metab_feats = names(MG_heatmap_key)
 
 Misame_matrix <- prepare_complete_heatmap_matrix(
@@ -502,65 +550,59 @@ Vital_matrix <- prepare_complete_heatmap_matrix(
 Vital_MG_Heatmap <- render_heatmap(
   matrix_r = Vital_matrix$r,                      
   matrix_p = Vital_matrix$p,                     
-  title = "VITAL",                                
+  title = "Mumta-LW",                                
   colors = colorRamp2(seq(-1, 1, length.out = 100), colorRampPalette(c("purple", "white", "forestgreen"))(100))
 )
 
-Figure5B = ggarrange(as.ggplot(Misame_MG_Heatmap), as.ggplot(Vital_MG_Heatmap), common.legend = TRUE)
+ Figure5B = ggarrange(as.ggplot(Misame_MG_Heatmap), as.ggplot(Vital_MG_Heatmap), common.legend = TRUE)
 Figure5B
-ggexport(MG_heatmap1, filename=paste0(fig_path, "/Figure5B.pdf"),
-         width=9, height=4.5)
+ggexport(Figure5B, filename=paste0(fig_path, "/Figure5B.pdf"),
+         width=10, height=4.5)
 ```
 
 ## Figure 5C
-
 ``` {r}
-# Function to generate protein-protein correlation data
-get_protein_protein_correlations <- function(label, data_map, Protein_key, main_metab, other_genes) {
-  
-  # Create correlation matrix
-  chosen_data <- data_map[[label]]
-  cor_matrix <- chosen_data$data %>%
-    left_join(chosen_data$other_genes) %>%
-    left_join(chosen_data$MSD_data) %>%
-    mutate(
-      IgA = ifelse(IgA == "Low Signal", NA, as.numeric(IgA)),
-      Insulin = ifelse(Insulin == "Low Signal", NA, as.numeric(Insulin)),
-      Leptin = ifelse(Leptin == "Low Signal", NA, as.numeric(Leptin)),
-      Calprotectin = ifelse(Calprotectin == "Low Signal", NA, as.numeric(Calprotectin))
-    ) %>%
-    dplyr::select(SampleID, metab_feats, IgA, Calprotectin, other_genes, H1) %>%
-    mutate_all(~ str_remove_all(., " ")) %>%
-    tibble::column_to_rownames("SampleID") %>%
-    as.matrix() %>%
-    rcorr(type = "spearman")
-  
-  # Extract correlation and p-value matrices
-  corr_matrix_r <- cor_matrix$r %>%
-    as.data.frame() %>%
-    dplyr::select(-main_metab) %>%
-    filter(!rownames(cor_matrix$r) %in% main_metab) %>%
-    tibble::rownames_to_column("Protein") %>%
-    convert_proteins_heatmap(Protein_key)
-  
-  corr_matrix_p <- cor_matrix$P %>%
-    as.data.frame() %>%
-    dplyr::select(-main_metab) %>%
-    filter(!rownames(cor_matrix$P) %in% main_metab) %>%
-    tibble::rownames_to_column("Protein") %>%
-    convert_proteins_heatmap(Protein_key)
-  
-  # Rename rows and columns
-  colnames(corr_matrix_r) <- Protein_key[colnames(corr_matrix_r)]
-  colnames(corr_matrix_p) <- Protein_key[colnames(corr_matrix_p)]
-  
-  corr_matrix_ordered_r <- corr_matrix_r[as.vector(unlist(Protein_key)), as.vector(unlist(Protein_key))]
-  corr_matrix_ordered_p <- corr_matrix_p[as.vector(unlist(Protein_key)), as.vector(unlist(Protein_key))]
-  
-  return(list(r = corr_matrix_ordered_r, p = corr_matrix_ordered_p))
+focus_genes_map_pvp <- list(
+  mis = unique(c(mis_milk_focus_genes, ECM_components)),
+  vit = unique(c(vit_milk_focus_genes, ECM_components))
+)
+
+# Calculate correlations for heatmap 
+misame_correlations <- get_heatmap_correlations_pvp(
+  focus_genes = focus_genes_map_pvp[["mis"]],
+  label = "Misame",
+  include_H1 = FALSE, #(context == "Milk"), # For reviewer figure
+  include_cho = TRUE,
+  include_hmo = FALSE, #(context == "Milk") # For reviewer figure
+  MSD_df = Mis_MSD,
+  MSD_feats = c("IgA", "Calprotectin")
+)
+
+vital_correlations <- get_heatmap_correlations_pvp(
+  focus_genes = focus_genes_map_pvp[["vit"]],
+  label = "Vital",
+  include_H1 = FALSE, #(context == "Milk"), # For reviewer figure
+  include_cho = TRUE,
+  include_hmo = FALSE, #(context == "Milk") # For reviewer figure
+  MSD_df = Vit_MSD,
+  MSD_feats = c("IgA", "Calprotectin")
+)
+
+# Function to extract heatmap order
+extract_HM_order <- function(corr_matrix_r) {
+  HM = Heatmap(corr_matrix_r)
+  pdf(NULL)
+  HM_drawn <- draw(HM)
+  dev.off()
+  row_order_vec <- row_order(HM_drawn)
+  ordered_rownames <- rownames(corr_matrix_r)[row_order_vec]
+  col_order_vec <- column_order(HM_drawn)
+  ordered_colnames <- colnames(corr_matrix_r)[col_order_vec]
+  if (!identical(ordered_rownames, ordered_colnames)) {stop("row/colnames don't match!")}
+  return(ordered_rownames)
 }
 # Function to render protein-protein correlation heatmaps
-render_protein_heatmap <- function(corr_matrix_r, corr_matrix_p, title, colors) {
+render_protein_heatmap <- function(corr_matrix_r, corr_matrix_p, title, order, colors, key) {
   Heatmap(corr_matrix_r,
     cell_fun = function(j, i, x, y, width, height, fill) {
       if (is.na(corr_matrix_p[i, j]) | corr_matrix_p[i, j] < 0.05) {
@@ -571,76 +613,41 @@ render_protein_heatmap <- function(corr_matrix_r, corr_matrix_p, title, colors) 
     },
     column_title = title,
     name = "Rho",
+    column_order = order,
+    row_order = order, 
     cluster_columns = FALSE,
     cluster_rows = FALSE,
     column_names_rot = -45,
-    col = colors
+    col = colors,
+    row_labels = key[rownames(corr_matrix_r)],
+    column_labels = key[colnames(corr_matrix_r)]
   )
 }
 
-# Define protein data for heatmap
-misame_milk_ecm_prots = c(mis_milk_focus_genes, ECM_components[ECM_components %in% colnames(misame_proteomics_filt_genes)])
-Mis_milk_ecm_df = misame_proteomics_filt_genes %>% tibble::rownames_to_column("SampleID") %>% filter(SampleID %in% Misame_everything$SampleID) %>%
-  dplyr::select(SampleID, misame_milk_ecm_prots) 
-
-vital_milk_ecm_prots = c(vit_milk_focus_genes, ECM_components[ECM_components %in% colnames(vital_proteomics_filt_genes)])
-Vit_milk_ecm_df = vital_proteomics_filt_genes %>% tibble::rownames_to_column("SampleID") %>% filter(SampleID %in% Vital_everything$SampleID) %>%
-  dplyr::select(SampleID, vital_milk_ecm_prots) 
-
-# Dataset-specific maps for MISAME and VITAL
-data_map <- list(
-  Misame = list(
-    data = Misame_everything,
-    other_genes = Mis_milk_ecm_df,
-    MSD_data = Mis_MSD
-  ),
-  Vital = list(
-    data = Vital_everything,
-    other_genes = Vit_milk_ecm_df,
-    MSD_data = Vit_MSD
-  )
-)
-
-
-
-# Generate MISAME matrix
-misame_correlations <- get_protein_protein_correlations(
-  label = "Misame",
-  data_map = data_map,
-  Protein_key = Protein_key_Misame,
-  main_metab = main_metab,
-  other_genes = misame_milk_ecm_prots
-)
-
-# Render MISAME heatmap
+misame_row_order = extract_HM_order(corr_matrix_r = as.matrix(misame_correlations$r))
+# Render Heatmaps, preserving row order
 Misame_protein_heatmap <- render_protein_heatmap(
-  corr_matrix_r = misame_correlations$r,
+  corr_matrix_r = as.matrix(misame_correlations$r),
   corr_matrix_p = misame_correlations$p,
+  order = misame_row_order, 
   title = "MISAME",
+  key = Protein_key_Misame,
   colors = colorRamp2(seq(-1, 1, length.out = 100), colorRampPalette(c("purple", "white", "forestgreen"))(100))
 )
-
-# Generate VITAL matrix
-vital_correlations <- get_protein_protein_correlations(
-  label = "Vital",
-  data_map = data_map,
-  Protein_key = Protein_key_Vital,
-  main_metab = main_metab,
-  other_genes = vital_milk_ecm_prots
-)
-
-# Render VITAL heatmap
+vital_row_order = misame_row_order
+vital_row_order[vital_row_order == "COL4A2"] <- "COL3A1"
 Vital_protein_heatmap <- render_protein_heatmap(
-  corr_matrix_r = vital_correlations$r,
+  corr_matrix_r = as.matrix(vital_correlations$r),
   corr_matrix_p = vital_correlations$p,
-  title = "VITAL",
+  title = "Mumta-LW",
+  order = vital_row_order, 
+  key = Protein_key_Vital,
   colors = colorRamp2(seq(-1, 1, length.out = 100), colorRampPalette(c("purple", "white", "forestgreen"))(100))
 )
 
 Figure5C = ggarrange(as.ggplot(Misame_protein_heatmap), 
                         as.ggplot(Vital_protein_heatmap), common.legend = TRUE)
 Figure5C
-
 ggexport(Figure5C, filename=paste0(fig_path, "/Figure5C.pdf"),
          width=10.8, height=4.8)
 ```

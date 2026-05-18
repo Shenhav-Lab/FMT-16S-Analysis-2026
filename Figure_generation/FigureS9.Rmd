@@ -1,0 +1,76 @@
+---
+title: "Figure S9. Short-chain acylcarnitine (C2-C5) levels are linked to elevated total protein levels"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S9
+``` {r}
+acylcolor = list(C2 = "lavender",
+                 C3 = "lightblue",
+                 C4 = "lightgreen",
+                 C5 = "orange")
+
+cut_quntiles = function(df, var) {
+  df = df %>% mutate(percentile = cut(!!sym(var), 
+                             breaks = quantile(!!sym(var), probs = 0:5 / 5, na.rm = TRUE), 
+                             include.lowest = TRUE, 
+                             labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+  filter(!is.na(!!sym(var)), percentile %in% c("0-20%", "80-100%"))
+}
+
+prot_boxplots = list("MISAME", "Mumta-LW")
+for (acylcarnitine in c("C2", "C3", "C4", "C5")) {
+  misame_plot = Misame_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    left_join(Misame_everything %>% dplyr::select(SampleID, Total_Protein) %>% unique()) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = Total_Protein)) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("Total Protein (g/100mL)") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  vital_plot = Vital_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    left_join(Vital_everything %>% dplyr::select(SampleID, Total_Protein) %>% unique()) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = Total_Protein)) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("Total Protein (mg/100mL)") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  if (acylcarnitine == "C2") {
+    misame_plot = misame_plot + ggtitle("MISAME") + theme(plot.title = element_text(hjust = 0.5))
+    vital_plot = vital_plot + ggtitle("Mumta-LW") + theme(plot.title = element_text(hjust = 0.5))
+  }
+  prot_boxplots[["MISAME"]][[acylcarnitine]] = misame_plot
+  prot_boxplots[["Mumta-LW"]][[acylcarnitine]] = vital_plot
+}
+
+
+FigureS9 = ggarrange(ggarrange(plotlist = prot_boxplots[["MISAME"]], ncol = 1, nrow = 4),
+                     ggarrange(plotlist = prot_boxplots[["Mumta-LW"]], ncol = 1, nrow = 4))
+
+
+ggexport(filename = paste0(fig_path, "/FigureS9.pdf"), 
+         plot = FigureS9,
+         width = 4, height = 8)
+```
+
+

@@ -33,12 +33,14 @@ weight_diff_df <- left_join(misame_metadata, inner_join(
   misame_metadata %>% filter(VISIT=="Delivery", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG) %>% dplyr::rename(wt_0=WTKG),
   misame_metadata %>% filter(VISIT=="Post Natal FU M06", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG, AGEDAYS) %>% dplyr::rename(wt_6=WTKG, AGE=AGEDAYS))) %>%
     mutate(delta_weight_6mo = wt_6-wt_0,
-           growth_vel_6mo=(1000*log(wt_6/wt_0))/AGE) # Patel exponential method
+           growth_vel_6mo=(1000*log(wt_6/wt_0))/AGE) %>% # Patel exponential method
+  dplyr::select(SUBJID, delta_weight_6mo, growth_vel_6mo)
 length_diff_df <- left_join(misame_metadata, inner_join(
   misame_metadata %>% filter(VISIT=="Delivery", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM) %>% dplyr::rename(len_0=LENCM),
   misame_metadata %>% filter(VISIT=="Post Natal FU M06", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM, AGEDAYS) %>% dplyr::rename(len_6=LENCM, AGE=AGEDAYS))) %>%
     mutate(delta_length_6mo = len_6-len_0,   
-           length_vel_6mo=delta_length_6mo/(AGE/30.437))
+           length_vel_6mo=delta_length_6mo/(AGE/30.437)) %>%
+  dplyr::select(SUBJID, delta_length_6mo, length_vel_6mo)
 
 # Trajectory plot
 Fig2A_p1 <- ggplot(misame_growth_df2, aes(x=Month, y=WAZ, color=WAZ_traj_cat, group=as.factor(SUBJIDO))) + geom_line(show.legend = FALSE) + facet_grid( . ~ WAZ_traj_cat ) + ylim(c(-5.5, 2.5)) + 
@@ -176,7 +178,8 @@ Figure2A
 
 ggexport(filename = paste0(fig_path, "/Figure2A.pdf"), 
        plot = Figure2A,
-       width = 16, height = 8)   
+       width = 16, height = 8)  
+
 ```
 
 ## Figure 2B

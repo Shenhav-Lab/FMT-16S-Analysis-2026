@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import glob
 
+
 def misame_meta_add_cols(misame_metadata):
     
     #add wide WAZ margin
@@ -32,7 +33,8 @@ def load_misame_raw_tables(dir_path='../output/all_tps'):
     for table_ in glob.glob(dir_path+'/*_raw.csv'):
         if any(x in table_ for x in ['vital','child','micro_all','metadata']):
             continue
-        table_id = table_.split('_')[2]
+        table_id = table_.split('/')[-1]
+        table_id = table_id.split('_')[1]
         tables_misame_all[table_id] = pd.read_csv(table_, index_col=0)
     
     tables_misame_all['untargeted_sapient'] = pd.read_csv(dir_path+'/misame_untargeted_sapient.csv', index_col=0)
@@ -45,7 +47,8 @@ def load_vital_raw_tables(dir_path='../output/all_tps'):
     for table_ in glob.glob(dir_path+'/*_raw.csv'):
         if any(x in table_ for x in ['misame','child','micro_all','metadata']):
             continue
-        table_id = table_.split('_')[2]
+        table_id = table_.split('/')[-1]
+        table_id = table_id.split('_')[1]
         tables_vital_all[table_id] = pd.read_csv(table_, index_col=0)
     
     tables_vital_all['untargeted_sapient'] = pd.read_csv(dir_path+'/vital_untargeted_sapient.csv', index_col=0)

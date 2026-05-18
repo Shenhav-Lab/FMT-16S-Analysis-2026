@@ -1,0 +1,426 @@
+---
+title: "Figure SS5. Associations between exploratory HM biomarkers and mammary gland functions"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S5
+``` {r}
+
+# Load Figure-specific data 
+enrichment_df_path = paste0(IMiC_path, "Databases/Tissue_Atlas/processed_tissue_enrichment.csv")
+enrichment_df = read.csv(enrichment_df_path, row.names = 1)
+enrichment_df_filt = enrichment_df %>% filter(p_val_perc_adjust < 0.05)
+Breast_glandular_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast glandular cells") %>% pull(Gene.name)
+Breast_myoepitheilal_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast myoepithelial cells") %>% pull(Gene.name)
+Immune_cell_types = c("B-cells", "Hofbauer cells", "Macrophages", "monocytes", "dendritic cells", "NK-cells", "Plasma cells", "granulocytes", "Kupffer cells", "Langerhans cells", "T-cells") 
+Immune_expr_genes = enrichment_df_filt %>% filter(Top_cell_type %in% Immune_cell_types) %>% pull(Gene.name)
+IG_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/protein_class_Immunoglobulin.tsv")) %>% pull(Gene)
+blood_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_blood.tsv")) %>% pull(Gene)
+female_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_female-reproductive-system.tsv")) %>% pull(Gene)
+ECM_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_ECM.tsv")) %>% pull(Gene)
+Tissue_atlas = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/rna_single_cell_type.tsv"))
+
+# Function to calculate proteomics correlation datasets for enrichment analysis and tabulation 
+get_proteomics_cor_lists = function(Misame_proteome_input, Vital_proteome_input, Feat) {
+  res_list = list()
+  misame_protein_rcorr_Feat = Misame_proteome_input %>% filter(Timepoint==2) %>%
+    dplyr::select(Feat, colnames(misame_proteomics_filt), -SampleID) %>%
+    as.matrix() %>% rcorr(type = 'spearman')
+  
+  misame_Feat_proteomics_assoc <- 
+    inner_join(misame_protein_rcorr_Feat$r %>% as.data.frame() %>% dplyr::select(Feat) %>% 
+               tibble::rownames_to_column("ProteinIds"),
+    misame_protein_rcorr_Feat$P %>% as.data.frame() %>% 
+      dplyr::rename(Feat = Feat) %>%
+      mutate(p.adjust = p.adjust(Feat, method = "BH")) %>% filter(p.adjust<0.05) %>%
+      dplyr::select(p.adjust) %>% tibble::rownames_to_column("ProteinIds")) %>%
+    left_join(misame_protein_meta)
+  
+  res_list[['misame_pos_assoc']] = misame_Feat_proteomics_assoc %>% filter(!!sym(Feat)>0)
+  res_list[['misame_neg_assoc']] = misame_Feat_proteomics_assoc %>% filter(!!sym(Feat)<0)
+  
+  vital_protein_rcorr_Feat = Vital_proteome_input %>% filter(Timepoint==2) %>%
+    dplyr::select(Feat, colnames(vital_proteomics_filt), -SampleID) %>%
+    as.matrix() %>% rcorr(type = 'spearman')
+  
+  vital_Feat_proteomics_assoc <- 
+    inner_join(vital_protein_rcorr_Feat$r %>% as.data.frame() %>% dplyr::select(Feat) %>% 
+               tibble::rownames_to_column("ProteinIds"),
+    vital_protein_rcorr_Feat$P %>% as.data.frame() %>% 
+      dplyr::rename(Feat = Feat) %>%
+      mutate(p.adjust = p.adjust(Feat, method = "BH")) %>% filter(p.adjust<0.05) %>%
+      dplyr::select(p.adjust) %>% tibble::rownames_to_column("ProteinIds")) %>%
+    left_join(vital_protein_meta)
+  
+  res_list[['vital_pos_assoc']] = vital_Feat_proteomics_assoc %>% filter(!!sym(Feat)>0)
+  res_list[['vital_neg_assoc']] = vital_Feat_proteomics_assoc %>% filter(!!sym(Feat)<0)
+  
+  return(res_list)
+}
+
+# Function to compute proteomics enrichment for an given "interest_set" of protein names and metabolite label
+calc_enrichment = function(label, interest_set, cor_df, source_prot_meta) {
+  non_cor_df = source_prot_meta %>% filter(!ProteinIds %in% cor_df$Gene.Name)
+  interest_ids = get(interest_set)
+  interest_in_set = cor_df %>% filter(Gene.Name %in% interest_ids) %>% pull(Gene.Name) %>% unique()
+  interest_notin_set = cor_df %>% filter(!Gene.Name %in% interest_in_set) %>% pull(Gene.Name) %>% unique()
+  noninterest_in_set = non_cor_df %>% filter(Gene.Name %in% interest_ids) %>% pull(Gene.Name) %>% unique()
+  noninterst_not_in_set = non_cor_df %>% filter(!Gene.Name %in% interest_in_set) %>% pull(Gene.Name) %>% unique()
+  
+  contingency = data.frame(matrix(c(length(interest_in_set), length(interest_notin_set),
+                                    length(noninterest_in_set), length(noninterst_not_in_set)), nrow=2))
+  p = chisq.test(contingency)$p.value
+  interest_ratio = length(interest_in_set)/length(interest_notin_set)
+  noninterest_ratio = length(noninterest_in_set)/length(noninterst_not_in_set)
+  
+  enrich_label = ifelse(interest_ratio > noninterest_ratio, "enrichment", "depletion")
+  ratio_enrichment = interest_ratio / noninterest_ratio
+  return(data.frame(Label = label, Category = interest_set, Enrichment=enrich_label, p=p, ratio_enrichment=ratio_enrichment))
+}
+
+# Wrapper function to calculate enrichments specified via 'params' using calc_enrichment
+calc_all_enrichments <- function(cor_obj, label, params) {
+  
+  cor_list <- list(MISAME_pos = cor_obj[["misame_pos_assoc"]],
+                   MISAME_neg = cor_obj[["misame_neg_assoc"]],
+                   Mumta_pos  = cor_obj[["vital_pos_assoc"]],
+                   Mumta_neg  = cor_obj[["vital_neg_assoc"]])
+  
+  meta_list <- list(MISAME = misame_protein_meta,
+                  Mumta = vital_protein_meta)
+  
+  params %>%
+    mutate(
+      result = pmap(list(dataset, direction, gene_set),
+                    function(dataset, direction, gene_set) {
+                      calc_enrichment(
+                        label = paste(label, dataset, direction),
+                        interest_set = gene_set,
+                        cor_df = cor_list[[paste0(dataset, "_", direction)]],
+                        source_prot_meta = meta_list[[dataset]]
+                      )
+                    }) 
+    ) %>% pull(result) %>% bind_rows() %>% 
+    mutate(Study = word(Label, 2), Feat = word(Label, 1), Direction = word(Label, 3))
+}
+
+
+# Set key for metabolites in correlation/enrichment analysis
+MG_heatmap_key = list(
+  "Creatinine" = "Creatinine",
+  "K" = "Potassium",
+  "Mg" = "Magnesium",
+  "ProBetaine" = "Proline betaine",
+  "p.Cresol.SO4" = "p-Cresol Sulfate",
+  "Pro" = "Proline",
+  "TMAO" = "TMAO"
+)
+
+# Compute: enrichment and correlation analysis for metabolites in MG_heatmap_key
+params <- crossing(dataset = c("MISAME", "Mumta"),
+                   direction = c("pos", "neg"),
+                   gene_set = c("Breast_glandular_expr_genes", "Breast_myoepitheilal_expr_genes", 
+                                "Immune_expr_genes", "IG_genes", "female_secrete_genes", 
+                                "ECM_secrete_genes"))
+prot_metab_cors = list()
+prot_metab_enrichments = list()
+for (metab in names(MG_heatmap_key)) {
+  prot_metab_cors[[metab]] = get_proteomics_cor_lists(Misame_proteome_ready, Vital_proteome_ready, metab)
+  prot_metab_enrichments[[metab]] = calc_all_enrichments(prot_metab_cors[[metab]], metab, params) 
+}
+
+# Tabulate highly correlated proteins per metabolite 
+count_corrs = function(feature, cor_list) {
+  res = bind_rows(
+    data.frame(Feat = feature, Direction = "pos", Study = "MISAME", Count = cor_list$misame_pos_assoc %>% nrow()),
+    data.frame(Feat = feature, Direction = "neg", Study = "MISAME", Count = cor_list$misame_neg_assoc %>% nrow()),
+    data.frame(Feat = feature, Direction = "pos", Study = "Mumta-LW", Count = cor_list$vital_pos_assoc %>% nrow()),
+    data.frame(Feat = feature, Direction = "neg", Study = "Mumta-LW", Count = cor_list$vital_neg_assoc %>% nrow()))
+  return(res)
+}
+
+# Compile total correlation counts
+corr_count_table <- bind_rows(
+  count_corrs("Creatinine", prot_metab_cors[["Creatinine"]]),
+  count_corrs("Potassium", prot_metab_cors[["K"]]),
+  count_corrs("Magnesium", prot_metab_cors[["Mg"]]),
+  count_corrs("Proline betaine", prot_metab_cors[["ProBetaine"]]),
+  count_corrs("Proline", prot_metab_cors[["Pro"]]),
+  count_corrs("TMAO", prot_metab_cors[["TMAO"]])
+) %>%
+  mutate(Feat = factor(Feat,
+                       levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine", 
+                                      "Proline",
+                                      "TMAO"))))
+
+# Combine enrichment data 
+full_enrichments = bind_rows(prot_metab_enrichments[["Creatinine"]], prot_metab_enrichments[["K"]], 
+                             prot_metab_enrichments[["Mg"]], prot_metab_enrichments[["ProBetaine"]], 
+                             prot_metab_enrichments[["Pro"]], prot_metab_enrichments[["TMAO"]])
+
+# Compute breast glandular cell enrichment 
+Glandular_enrich_df = full_enrichments %>% filter(Category=="Breast_glandular_expr_genes", Study %in% c("MISAME", "Mumta"), 
+                                                  Direction=="neg") %>% 
+  mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),,
+         Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
+         Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
+                                     levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine", 
+                                      "Proline",
+                                      "TMAO"))))
+# plot breast glandular cell enrichment
+Glandular_enrich_plot = Glandular_enrich_df %>%
+  ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+           #colour = ifelse(Glandular_enrich_df$p < 0.05, "black", NA)) +
+  geom_text(data = subset(Glandular_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="Mumta-LW"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=0.2),
+                color = "black") +
+  geom_text(data = subset(Glandular_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=-0.25),
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Negatively Associated Proteins)") + ggtitle("Breast Glandular \nCell-Enriched Proteins") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB")) 
+
+# Compute female secretion enrichment
+female_secrete_enrich_df = full_enrichments %>% filter(Category=="female_secrete_genes", Study %in% c("MISAME", "Mumta"), 
+                                                  Direction=="neg") %>% 
+  mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),,
+         Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
+         Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
+                                     levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine",  
+                                      "Proline",
+                                      "TMAO"))))
+
+# Plot female secretion enrichemnt
+Female_secrete_enrich_plot = female_secrete_enrich_df %>%
+  ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+  geom_text(data = subset(female_secrete_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="Mumta-LW"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=0.2),
+                color = "black") +
+  geom_text(data = subset(female_secrete_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=-0.25),
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Negatively Associated Proteins)") + ggtitle("Proteins Secreted To \nFemale Reproductive System") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
+
+# Compute EC< enrichment
+ecm_secrete_enrich_df = full_enrichments %>% filter(Category=="ECM_secrete_genes", Study %in% c("MISAME", "Mumta"), 
+                                                  Direction=="pos") %>% 
+  mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
+         Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
+         Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
+                                     levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine",  
+                                      "Proline",
+                                      "TMAO"))))
+# Plot ECM enrichment
+ECM_secrete_enrich_plot = ecm_secrete_enrich_df %>%
+  ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+  geom_text(data = subset(ecm_secrete_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="Mumta-LW"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=0.2),
+                color = "black") +
+  geom_text(data = subset(ecm_secrete_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=-0.25),
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Proteins Secreted To ECM") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
+
+# Compute immune cell enrichment
+immune_expr_enrich_df = full_enrichments %>% filter(Category=="Immune_expr_genes", Study %in% c("MISAME", "Mumta"), 
+                                                  Direction=="pos") %>% 
+  mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
+         Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
+         Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
+                                     levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine",  
+                                      "Proline",
+                                      "TMAO"))))
+
+# Plot immune cell enrichment
+Immune_expr_enrich_plot = immune_expr_enrich_df %>%
+  ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+  geom_text(data = subset(immune_expr_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="Mumta-LW"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=0.2),
+                color = "black") +
+  geom_text(data = subset(immune_expr_enrich_df, as.numeric(p) < 0.05) %>% filter(Study=="MISAME"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=-0.25),
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Immune Cell-Enriched Proteins") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
+
+# Calculate immunoglobin enrichment
+Ig_enrich_df = full_enrichments %>% filter(Category=="IG_genes", Study %in% c("MISAME", "Mumta"), 
+                                                  Direction=="pos") %>% 
+  mutate(ratio_enrichment = ifelse(Enrichment=="depletion", NA, ratio_enrichment),
+         Study=ifelse(Study=="Mumta", "Mumta-LW", Study),
+         Putative_biomarker = factor(unlist(MG_heatmap_key[Feat]), 
+                                     levels = rev(c("Creatinine", 
+                                      "Potassium",
+                                      "Magnesium", 
+                                      "Proline betaine",  
+                                      "Proline",
+                                      "TMAO"))))
+
+# Plot immunoglobin enrichment
+IG_enrich_plot = Ig_enrich_df %>%
+  ggplot(aes(y=Putative_biomarker, x=log2(ratio_enrichment), fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+  geom_text(data = subset(subset(Ig_enrich_df, as.numeric(p) < 0.05), Enrichment=="enrichment") %>% filter(Study=="Mumta-LW"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=0.2),
+                color = "black") +
+  geom_text(data = subset(subset(Ig_enrich_df, as.numeric(p) < 0.05), Enrichment=="enrichment") %>% filter(Study=="MISAME"),
+            aes(x = 0, 
+                label = paste("p =", signif(as.numeric(p), 3)),
+                vjust = 0.35, hjust = -0.1),
+                position = position_nudge(y=-0.25),
+                color = "black") + geom_vline(xintercept=0) + theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab(expression(Log[2]*"(Enrichment)")) + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Immunoglobulin Proteins") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB"))
+
+# Combine Enrichment plots
+Enrich_plots = ggarrange(Glandular_enrich_plot, Female_secrete_enrich_plot, ECM_secrete_enrich_plot, Immune_expr_enrich_plot, IG_enrich_plot, nrow = 1)
+
+# Plot negative correlation count data 
+neg_corr_count_df = corr_count_table %>% filter(Direction=="neg") %>%
+  ggplot(aes(y=Feat, x=Count, fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+           #colour = ifelse(Glandular_enrich_df$p < 0.05, "black", NA)) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab("Total proteins") + ylab("Putative Biomarker \n (Negatively Associated Proteins)") + ggtitle("Significant Negative Protein Associations\n") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB")) 
+
+# Plot positive correlation count data
+pos_corr_count_df = corr_count_table %>% filter(Direction=="pos") %>%
+  ggplot(aes(y=Feat, x=Count, fill = Study)) + 
+  geom_bar(stat = "identity", position = position_dodge(),
+           colour = "darkgray") +
+           #colour = ifelse(Glandular_enrich_df$p < 0.05, "black", NA)) +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        ) + 
+  labs( fill = "Study") +
+  xlab("Total proteins") + ylab("Putative Biomarker \n (Positively Associated Proteins)") + ggtitle("Significant Positive Protein Associations") +
+  scale_fill_manual(values = c("MISAME" = "#A6CEE3", "Mumta-LW" = "#FFDBBB")) 
+
+FigureS5_top = ggarrange(pos_corr_count_df, ECM_secrete_enrich_plot, Immune_expr_enrich_plot, IG_enrich_plot, nrow = 1)
+FigureS5_bottom = ggarrange(neg_corr_count_df, Glandular_enrich_plot, Female_secrete_enrich_plot, nrow = 1)
+
+ggarrange(FigureS5_top, FigureS5_bottom, ncol = 1)
+
+fig_path <- "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures/NEW"
+ggexport(filename = paste0(fig_path, "/FigureS5_top.pdf"),
+         plot = FigureS5_top,
+        width = 23.04, height = 4.5)
+ggexport(filename = paste0(fig_path, "/FigureS5_bottom.pdf"),
+         plot = FigureS5_bottom,
+        width = 19.25, height = 4.5)
+```
+
+

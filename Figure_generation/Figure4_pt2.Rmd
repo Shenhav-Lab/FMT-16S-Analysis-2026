@@ -1,0 +1,509 @@
+---
+title: "Figure 4BC. Leveraging universal infant growth and maternal nutritional signals to identify putative growth-associated biomarkers of mammary gland dysfunction"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure 4B
+Figure-specific functions
+``` {r}
+# Function to plot ML stats
+plot_ML_stats = function(df, var, comparisons, color_map, ylab=var, report = "plot") {
+  summary_table = df %>%
+    group_by(Features, Prediction) %>%
+    dplyr::summarize(
+      mean = mean(!!sym(var)),
+      SE = sd(!!sym(var)) / sqrt(n()),
+      .groups = 'drop'
+    )
+  
+  wilcox_df = data.frame()
+  for (Test in unique(df$Prediction)) {
+    for (pair in comparisons) {
+      A = df %>% filter(Prediction %in% Test,
+                                     Features %in% pair[1]) %>% pull(!!var)
+      B = df %>% filter(Prediction %in% Test,
+                                     Features %in% pair[2]) %>% pull(!!var)
+      p_value = wilcox.test(A, B)$p.value
+      row = data.frame(Prediction = Test, group1=pair[1], group2=pair[2], p=p_value)
+      wilcox_df = bind_rows(wilcox_df, row)
+    }
+  }
+  
+  wilcox_df <- wilcox_df %>%
+    mutate(p.signif = case_when(
+      p < 0.001 ~ "***",
+      p < 0.01 ~ "**",
+      p < 0.05 ~ "*",
+      TRUE ~ "ns"
+    ))
+  
+  # Calculate base heights for each facet
+  facet_heights = summary_table %>% 
+    group_by(Prediction) %>% 
+    dplyr::summarize(base_height = max(mean + SE), .groups = 'drop')
+  
+  # Join and calculate y.position with step that resets per facet
+  wilcox_df = wilcox_df %>% 
+    left_join(facet_heights, by = "Prediction") %>%
+    group_by(Prediction) %>%
+    mutate(
+      comparison_num = row_number(),  # Number comparisons within each facet
+      y.position = base_height * 1.05 + (comparison_num - 1) * (base_height * 0.08)
+    ) %>%
+    ungroup()
+  
+  plot = ggplot(summary_table, aes(y = mean, x = Features, fill = Features)) +
+    geom_bar(stat = "identity") +
+    geom_errorbar(aes(ymin = mean - SE, ymax = mean + SE),
+                  width = 0.2) +
+    facet_grid(. ~ Prediction) +
+    stat_pvalue_manual(wilcox_df,
+                       y.position = "y.position",  # Use pre-calculated positions
+                       step.increase = 0,  # Set to 0 since we calculated manually
+                       label = "p.signif") +
+    ylab(var) +
+    xlab("Features") +
+    theme_classic() +
+    #scale_y_continuous(position = "right") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_line(color = "grey90", size = 0.5),
+      panel.grid.minor = element_line(color = "grey95", size = 0.25)
+      #axis.title.x = element_text(angle = 180),
+      #axis.title.y = element_text(angle = 90)
+    ) + ylab(ylab) +
+    scale_fill_manual(values = setNames(color_map$color, color_map$category))
+  if (report=="plot") {
+    return(plot)
+  } else {
+    return(wilcox_df)
+  } 
+}
+```
+Load ML plotting data
+``` {r}
+ML_stats = read.csv("C:/Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Code/machine_learning/ML_stats_output.csv", row.names = 1)
+
+# Sorted by input features
+baseline_runs = c("misame_BEP_baseline.pickle", 
+                  "misame_wazmargin_baseline.pickle", 
+                  "vital_BEP_baseline.pickle", 
+                  "vital_wazmargin_baseline.pickle", 
+                  "child_wazmargin_baseline.pickle")
+targeted_runs =  c("child_wazmargin_crosswaz_ae_pure.pickle",
+                   "misame_BEP_topfeats_ae.pickle", 
+                   "misame_wazmargin_crosswaz_ae_pure.pickle", 
+                   "vital_BEP_topfeats_ae.pickle", 
+                   "vital_wazmargin_crosswaz_ae_pure.pickle")
+untargeted_runs = c("child_WAZ_cs_overlap_sig_feats_gbm.pickle",
+                    "misame_BEP_fromMeanMaxUnionBEP_meta_for_ML_gbm.pickle",
+                    "misame_cs_overlap_sig_feats_gbm.pickle",
+                    "vital_BEP_fromMeanMaxUnionBEP_meta_for_ML_gbm.pickle",
+                    "vital_waz_cs_overlap_sig_feats_gbm.pickle")
+untargeted_104 = c("child_WAZ_all_gbm.pickle", "misame_all_gbm.pickle",
+                   "misame_bep_all_gbm.pickle", "vital_bep_all_gbm.pickle",
+                   "vital_waz_all_gbm.pickle")
+# Sorted by Prediction
+Misame_BEP = c("misame_BEP_baseline.pickle", 
+               "misame_BEP_topfeats_ae.pickle", 
+               "misame_BEP_fromMeanMaxUnionBEP_meta_for_ML_gbm.pickle",
+               "misame_bep_all_gbm.pickle")
+Misame_WAZ =  c("misame_wazmargin_baseline.pickle",
+                "misame_wazmargin_crosswaz_ae_pure.pickle", 
+                "misame_cs_overlap_sig_feats_gbm.pickle",
+                "misame_all_gbm.pickle")
+Vital_BEP = c("vital_BEP_baseline.pickle", 
+              "vital_BEP_topfeats_ae.pickle", 
+              "vital_BEP_fromMeanMaxUnionBEP_meta_for_ML_gbm.pickle",
+              "vital_bep_all_gbm.pickle")
+Vital_WAZ = c("vital_wazmargin_crosswaz_ae_pure.pickle",
+              "vital_wazmargin_baseline.pickle",
+              "vital_waz_all_gbm.pickle", 
+              "vital_waz_cs_overlap_sig_feats_gbm.pickle")
+Child_WAZ = c("child_wazmargin_baseline.pickle", 
+              "child_wazmargin_crosswaz_ae_pure.pickle",
+              "child_WAZ_cs_overlap_sig_feats_gbm.pickle",
+              "child_WAZ_all_gbm.pickle")
+
+ML_stats_parsed = ML_stats %>% 
+  filter(Run %in% c(baseline_runs, targeted_runs, untargeted_runs, untargeted_104)) %>%
+  mutate(Features = case_when(Run %in% baseline_runs ~ 'Naïve',
+                              Run %in% targeted_runs ~ 'Targeted',
+                              Run %in% untargeted_runs ~  'Untargeted',
+                              Run %in% untargeted_104 ~ 'Untargeted (MS2)',
+                              TRUE ~ NA),
+         Prediction = case_when(Run %in% Misame_BEP ~ "MISAME BEP",
+                                Run %in% Misame_WAZ ~ "MISAME WAZ",
+                                Run %in% Vital_BEP ~ "Mumta-LW BEP",
+                                Run %in% Vital_WAZ ~ "Mumta-LW WAZ",
+                                Run %in% Child_WAZ ~ "CHILD WAZ",
+                                 TRUE ~ NA)) %>%
+  arrange(desc(Prediction))
+```
+Plotting Data
+``` {r}
+comparisons1 = list(c('Naïve', 'Targeted'),
+                    c('Naïve', 'Untargeted'),
+                    c('Naïve', 'Untargeted (MS2)'))
+color_map1 <- data.frame(
+  category = c('Targeted', 'Untargeted', 'Untargeted (MS2)', 'Naïve'),
+  color = c('#0072B2', '#E69F00', '#009E73', '#808080')
+)
+ML_stat_plots = list(
+  plot_ML_stats(df = ML_stats_parsed, var = "AUC", comparisons = comparisons1, color_map = color_map1, ylab = "ROC AUC"),
+  plot_ML_stats(df = ML_stats_parsed, var = "Precision", comparisons = comparisons1, color_map = color_map1),
+  plot_ML_stats(df = ML_stats_parsed, var = "Balanced_acc", comparisons = comparisons1, color_map = color_map1, ylab = "Balanced Accuracy"))
+ML_stat_dfs = list(
+  plot_ML_stats(df = ML_stats_parsed, var = "AUC", comparisons = comparisons1, color_map = color_map1, report = "df"),
+  plot_ML_stats(df = ML_stats_parsed, var = "Precision", comparisons = comparisons1, color_map = color_map1, report = "df"),
+  plot_ML_stats(df = ML_stats_parsed, var = "Balanced_acc", comparisons = comparisons1, color_map = color_map1, report = "df"))
+Figure4B = ggarrange(plotlist = ML_stat_plots, common.legend = TRUE, ncol = 1, nrow = 3)
+Figure4B
+ggexport(Figure4B, filename = paste0(fig_path, "/Figure_4B.pdf"), width = 8, height = 9.8)
+```
+
+## Figure 4C
+Figure-specific Functions
+``` {r}
+# Function to process ranked enrichment data
+RE_process = function(ranked_analysis_data=ranked_analysis_data, featlist=c()) {
+  full_output = list()
+  positive_list = list()
+  negative_list = list()
+  RE_process_subset = function(df, study, subset) {
+    df %>% 
+        filter(pathway==each_pathway) %>%
+        filter(metabolite %in% subset) %>%
+        mutate(padj = p.adjust(pval, method = "BH")) %>%
+        mutate(!!sym(study) := pval_to_stars(padj)) %>%
+        dplyr::select(metabolite, pathway, NES, !!sym(study), everything())
+  }
+  RE_process_all = function(df, study) {
+    df %>% 
+        filter(pathway==each_pathway) %>%
+        mutate(padj = p.adjust(pval, method = "BH")) %>%
+        mutate(!!sym(study) := pval_to_stars(padj)) %>%
+        dplyr::select(metabolite, pathway, NES, !!sym(study), everything())
+  }
+  for (each_pathway in pathway_list) {
+    each_pathway_list = list()
+    for (study in names(ranked_analysis_data)) {
+      df =  ranked_analysis_data[[study]]
+      if (length(featlist)>0) {
+        each_pathway_list[[study]] = RE_process_subset(df, study, featlist)
+      } else {each_pathway_list[[study]] = RE_process_all(df, study)}
+    }
+    full_output[[each_pathway]] = each_pathway_list
+    negative_list[[each_pathway]] = inner_join(
+      each_pathway_list[["MISAME"]] %>% filter(NES<0, padj<0.05) %>% 
+        dplyr::select(metabolite, pathway, MISAME),
+      each_pathway_list[["VITAL"]] %>% filter(NES<0, padj<0.05) %>% 
+        dplyr::select(metabolite, pathway, VITAL)) %>% mutate(direction = "negative")
+    positive_list[[each_pathway]] = inner_join(
+      each_pathway_list[["MISAME"]] %>% filter(NES>0, padj<0.05) %>% 
+        dplyr::select(metabolite, pathway, MISAME),
+      each_pathway_list[["VITAL"]] %>% filter(NES>0, padj<0.05) %>% 
+        dplyr::select(metabolite, pathway, VITAL)) %>% mutate(direction = "positive")
+  }
+  return(list("full_output" = full_output, "positive_list" = positive_list, "negative_list" = negative_list))
+}
+```
+Ranked Enrichment Analysis
+``` {r}
+misame_ranked_analysis_unfilt_file = paste0(IMiC_path, "IMiC/Code/R_analysis/Ranked_enrichment/MISAME_ranked_analysis_unfiltered_no_covar.csv")
+vital_ranked_analysis_unfilt_file = paste0(IMiC_path, "IMiC/Code/R_analysis/Ranked_enrichment/VITAL_ranked_analysis_unfiltered_no_covar.csv")
+if (file.exists(misame_ranked_analysis_unfilt_file) & file.exists(vital_ranked_analysis_unfilt_file)) {
+  misame_ranked_analysis_unfilt = read.csv(misame_ranked_analysis_unfilt_file, row.names = 1)
+  vital_ranked_analysis_unfilt = read.csv(vital_ranked_analysis_unfilt_file, row.names = 1)
+} else {
+  # Calculate ranks
+  ranked_vectors = list()
+  all_spearman_pvals = list()
+  all_spearman_rho = list()
+  for (study in c("MISAME", "VITAL")) {
+    # Set params
+    if (study == "MISAME") {
+      proteo_df = misame_proteomics_filt
+      metab_meta_df = Misame_everything
+      metab_names = colnames(misame_targeted)
+      proteo_meta = misame_protein_meta
+    } else if (study == "VITAL") {
+      proteo_df = vital_proteomics_filt
+      metab_meta_df = Vital_everything
+      metab_names = colnames(vital_targeted)
+      proteo_meta = vital_protein_meta
+    } else {"study unrecognized; options include 'MISAME' or 'VITAL'"}
+    # Extract annotated proteins
+    protein_names = setdiff(colnames(proteo_df), "SampleID")
+    annotated_prots = proteo_meta %>% filter(!is.na(Gene.Name)) %>% rownames()
+    protein_names = protein_names[protein_names %in% annotated_prots]
+    # Merge data 
+    proteo_metab_df = inner_join(proteo_df, metab_meta_df) %>%
+    dplyr::select(metab_names, protein_names)
+    # Calculate metabolite-protein Spearman correlations
+    metab_prot_corr = proteo_metab_df %>%
+      as.matrix() %>% rcorr(type = 'spearman')
+    # Extract ranked protein-association vectors per metabolite
+    metab_prot_rho = as.data.frame(metab_prot_corr$r)[protein_names, metab_names] 
+    metab_prot_rho_labelled = metab_prot_rho %>% tibble::rownames_to_column("ProteinIds") %>% left_join(proteo_meta) %>%
+      tibble::column_to_rownames("Gene.Name") %>% dplyr::select(-ProteinIds)
+    sublist = list()
+    for (metab in metab_names) {
+      vec = metab_prot_rho_labelled[[metab]]
+      names(vec) = rownames(metab_prot_rho_labelled) # Verified that this aligns with all_spearman_rho
+      vec_ranked = vec %>% sort()
+      sublist[[metab]] = vec_ranked
+    }
+    # Save results per study
+    ranked_vectors[[study]] = sublist
+  }
+  
+  # Parse output
+  for (study in c("MISAME", "VITAL")) {
+    if (study == "MISAME") {
+      featlist = colnames(misame_targeted)
+    } else if (study == "VITAL") {
+      featlist = colnames(vital_targeted)
+    } else {"study unrecognized; options include 'MISAME' or 'VITAL'"}
+    enrichment_res = data.frame()
+    for (var in featlist) {
+      each_ranklist = rev(ranked_vectors[[study]][[var]])
+      fsea_res = fgsea(
+        pathway = pathway_list,
+        stats = each_ranklist,
+        minSize = 3,
+        maxSize = 500,
+        nPermSimple = 10000,
+        nproc = 1
+      ) %>% mutate(metabolite = var, study = study) %>%
+        dplyr::select(pathway, metabolite, pval, log2err, ES, NES, size, study)
+      enrichment_res = bind_rows(enrichment_res, fsea_res)
+    }
+    
+    enrichment_res_parsed = enrichment_res %>% group_by(pathway) %>%
+      dplyr::select(pathway, metabolite, pval, log2err, ES, NES, size, study) %>%
+      mutate(padj = p.adjust(pval, method = "BH")) %>%
+      ungroup()
+    enrichment_res_parsed %>% arrange(pathway, NES) %>%
+      write.csv(paste0(IMiC_path, "/Code/R_analysis/Ranked_enrichment/", study, "_ranked_analysis_unfiltered.csv"))
+  }
+}
+```
+Defining nutrients for ranked enrichment analysis plots
+``` {r}
+nutrient_heatmap_key = list("PA" = "Pantothenic Acid",
+                            "Bio" = "Biotin",
+                            "Sia"="Sialylated HMOs",
+                            "Se"="Selenium",
+                            "g.tocopherol" ="γ-Tocopherol",
+                            "HipAcid" = "Hippuric Acid",
+                            "B2" = "Vitamin B2",
+                            "X6.SL" = "6'-Sialyllactose",
+                            "LNFP.III" = "LNFP III",
+                            "AABA" = "α-Aminobutyric acid",
+                            "Mn" = "Manganese",
+                            "C5" = "Valerylcarnitine (C5)",
+                            "B6" = "Vitamin B6",
+                            "B1" = "Vitamin B1",
+                            "p.Cresol.SO4" = "p-Cresol Sulfate",
+                            "Ca" = "Calcium",
+                            "PC.ae.C34.0" = "PC (34:0)",
+                            "LNnT" = "LNnT",
+                            "K" = "Potassium", 
+                            "Cit" = "Citrulline",
+                            "Lys" = "Lysine",
+                            "TG.16.1_36.1." = "TG (16:1/36.1)",
+                            "TG.18.2_36.0." = "TG (18:2/36.0)",
+                            "X3.SL" = "3'-Sialyllactose",
+                            "LSTb" = "LSTb",
+                            "Creatinine" = "Creatinine",
+                            "FLNH" = "FLNH")
+consistent_feat_key = list(
+  "C2" = "Acetylcarnitine (C2)",
+  "C3" = "Propionylcarnitine (C3)",
+  "C4" = "Butylcarnitine (C4)",
+  "C5" = "Valerylcarnitine (C5)",
+  "Na" = "Sodium",
+  "X6.SL" = "6'-Sialyllactose",
+  "Mg" = "Magnesium",
+  "Creatinine" = "Creatinine",
+  "ProBetaine" = "Proline Betaine",
+  "p.Cresol.SO4" = "p-Cresol Sulfate",
+  "Pro" = "Proline",
+  "TMAO" = "TMAO"
+)
+```
+``` {r}
+enrichment_df_path = paste0(IMiC_path, "Databases/Tissue_Atlas/processed_tissue_enrichment.csv")
+enrichment_df = read.csv(enrichment_df_path, row.names = 1)
+enrichment_df_filt = enrichment_df %>% filter(p_val_perc_adjust < 0.05)
+ 
+Breast_glandular_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast glandular cells") %>% pull(Gene.name)
+Breast_myoepitheilal_expr_genes = enrichment_df_filt %>% filter(Top_cell_type=="Breast myoepithelial cells") %>% pull(Gene.name)
+Immune_cell_types = c("B-cells", "Hofbauer cells", "Macrophages", "monocytes", "dendritic cells", "NK-cells", "Plasma cells", "granulocytes", "Kupffer cells", "Langerhans cells", "T-cells") 
+Immune_expr_genes = enrichment_df_filt %>% filter(Top_cell_type %in% Immune_cell_types) %>% pull(Gene.name)
+IG_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/protein_class_Immunoglobulin.tsv")) %>% pull(Gene)
+blood_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_blood.tsv")) %>% pull(Gene)
+female_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_female-reproductive-system.tsv")) %>% pull(Gene)
+ECM_secrete_genes = read.delim(paste0(IMiC_path, "Databases/Tissue_Atlas/Secretome/sa_location_Secreted_to_ECM.tsv")) %>% pull(Gene)
+pathway_list = c("Immune_expr_genes", "IG_genes", "ECM_secrete_genes",
+                 "Breast_glandular_expr_genes", "female_secrete_genes")
+select_feats_full = c('Cit','Bio','K','Creatinine','Lys','LSTb','PA','B1','B2',
+                 'HipAcid','C5','AABA','PC.ae.C34.0','LNnT','Se','FLNH',
+                 'TG.16.1_36.1.','TG.18.2_36.0.', "X6.SL", 'B6', 'LNFP.III', 'g.tocopherol', 'X3.SL')
+
+ranked_analysis_data = list("MISAME" = misame_ranked_analysis_unfilt,
+                            "VITAL" = vital_ranked_analysis_unfilt)
+
+all_targeted_RE_results = RE_process(ranked_analysis_data)
+select23_RE_results = RE_process(ranked_analysis_data, featlist = select_feats_full)
+
+shared_dysfunction_from23_feats_summary = 
+  list(Breast_glandular_expr_genes = select23_RE_results$negative_list$Breast_glandular_expr_genes,
+       female_secrete_genes = select23_RE_results$negative_list$female_secrete_genes,
+       ECM_secrete_genes = select23_RE_results$positive_list$ECM_secrete_genes,
+       Immune_expr_genes = select23_RE_results$positive_list$Immune_expr_genes,
+       IG_genes = select23_RE_results$positive_list$IG_genes)
+shared_dysfunction_from23_feats_summary
+
+shared_dysfunction_from_all_feats_summary = 
+  list(Breast_glandular_expr_genes = all_targeted_RE_results$negative_list$Breast_glandular_expr_genes,
+       female_secrete_genes = all_targeted_RE_results$negative_list$female_secrete_genes,
+       ECM_secrete_genes = all_targeted_RE_results$positive_list$ECM_secrete_genes,
+       Immune_expr_genes = all_targeted_RE_results$positive_list$Immune_expr_genes,
+       IG_genes = all_targeted_RE_results$positive_list$IG_genes)
+shared_dysfunction_from_all_feats_summary
+``` 
+Build Figure 4C1
+``` {r}
+# Extract stats for 23 nutrition/growth-linked features
+select_23_topfeat_stats = list()
+for (each_pathway in pathway_list) {
+  df = bind_rows(select23_RE_results$full_output[[each_pathway]]$MISAME,
+                 select23_RE_results$full_output[[each_pathway]]$VITAL) %>%
+    mutate(top_set = metabolite %in% shared_dysfunction_from23_feats_summary[[each_pathway]]$metabolite,
+           log10_FDR = -log10(padj)) %>%
+    group_by(metabolite) %>%
+    mutate(NES_mean = mean(NES)) %>% 
+    ungroup() %>%
+    arrange(NES_mean)
+  df$Metabolite <- sapply(df$metabolite, function(x) {if(x %in% names(nutrient_heatmap_key)) nutrient_heatmap_key[[x]] else NA })
+  df = df %>% mutate(Metabolite = factor(Metabolite, levels = unique(df$Metabolite)))
+  select_23_topfeat_stats[[each_pathway]] = df
+}
+
+row_order_23 = c('C5', 'Lys', 'Se', 'X6.SL', 'Creatinine', 'g.tocopherol', 'PC.ae.C34.0', 'TG.16.1_36.1.', 'LSTb', 'K', 'HipAcid', 
+                 'FLNH', 'AABA', 'B2', 'TG.18.2_36.0.', 'B1', 'Cit', 'LNnT', 'X3.SL', 'B6', 'PA', "Bio", 'LNFP.III')
+
+# Generate list of heatmap columns 
+RE_heatmaps1 = list()
+for (each_pathway in pathway_list) {
+  # Subset data
+  df = select_23_topfeat_stats[[each_pathway]]
+  
+  # Extract enrichment stats
+  Misame_res = df %>% filter(study=="MISAME") %>% tibble::column_to_rownames("Metabolite") 
+  Misame_res = Misame_res[unlist(nutrient_heatmap_key[row_order_23]), ] %>% tibble::rownames_to_column("Metabolite")
+  Misame_NES = Misame_res %>% dplyr::select(Metabolite, NES) %>% dplyr::rename("MISAME"="NES")
+  Misame_p_star = Misame_res %>% dplyr::select(Metabolite, MISAME) 
+  Vital_res = df %>% filter(study=="VITAL") %>% tibble::column_to_rownames("Metabolite") 
+  Vital_res = Vital_res[unlist(nutrient_heatmap_key[row_order_23]), ] %>% tibble::rownames_to_column("Metabolite") 
+  Vital_NES = Vital_res %>% dplyr::select(Metabolite, NES) %>% dplyr::rename("Mumta-LW"="NES")
+  Vital_p_star = Vital_res %>% dplyr::select(Metabolite, VITAL)  %>% dplyr::rename("Mumta-LW"="VITAL")
+  NES_data = full_join(Misame_NES, Vital_NES) %>% tibble::column_to_rownames("Metabolite") 
+  p_star_data = full_join(Misame_p_star, Vital_p_star) %>% tibble::column_to_rownames("Metabolite") 
+  
+  # Generate heatmap
+  RE_heatmaps1[[each_pathway]] = NES_data %>% Heatmap(
+    cluster_rows = FALSE, cluster_columns = FALSE, column_names_centered = TRUE, 
+    col = colorRamp2(seq(-5, 5, length.out = 101), colorRampPalette(c("purple", "white", "forestgreen"))(101)),
+    name = "NES", show_heatmap_legend = TRUE,
+    column_title = each_pathway, column_names_rot = 0,
+    show_column_names = TRUE, show_row_names = TRUE, row_names_side = "left" , 
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      text_label <- p_star_data[i, j]
+      grid.text(text_label, x, y, gp = gpar(fontsize = 10, col = "black"))
+    }
+  ) %>% as.ggplot()
+}
+
+Figure4C1 = ggarrange(plotlist = rev(RE_heatmaps1), nrow = 1, ncol = 5, common.legend = TRUE)
+Figure4C1
+ggexport(filename = paste0(fig_path, "/Figure_4C1.pdf"), 
+         plot = Figure4C1,
+        width = 15, height = 6)
+```
+``` {r}
+# Extract stats for features with consistent mammary distress/dysregulation associations
+consistent_topfeat_stats = list()
+for (each_pathway in pathway_list) {
+  df = bind_rows(all_targeted_RE_results$full_output[[each_pathway]]$MISAME,
+                 all_targeted_RE_results$full_output[[each_pathway]]$VITAL) %>%
+    mutate(log10_FDR = -log10(padj)) %>%
+    filter(metabolite %in% names(consistent_feat_key)) %>%
+    group_by(metabolite) %>%
+    mutate(NES_mean = mean(NES)) %>% 
+    ungroup() %>%
+    arrange(NES_mean)
+  df$Metabolite <- sapply(df$metabolite, function(x) {if(x %in% names(consistent_feat_key)) consistent_feat_key[[x]] else NA })
+  df = df %>% mutate(Metabolite = factor(Metabolite, levels = unique(df$Metabolite)))
+  consistent_topfeat_stats[[each_pathway]] = df
+}
+
+# Compile list of heatmap columns
+RE_heatmaps2 = list()
+for (each_pathway in pathway_list) {
+  # Subset data
+  df = consistent_topfeat_stats[[each_pathway]]
+  
+  # Extract enrichment stats
+  Misame_res = df %>% filter(study=="MISAME", metabolite %in% names(consistent_feat_key)) %>% tibble::column_to_rownames("Metabolite") 
+  Misame_res = Misame_res[unlist(consistent_feat_key), ] %>% tibble::rownames_to_column("Metabolite")
+  Misame_NES = Misame_res %>% dplyr::select(Metabolite, NES) %>% dplyr::rename("MISAME"="NES")
+  Misame_p_star = Misame_res %>% dplyr::select(Metabolite, MISAME) 
+  Vital_res = df %>% filter(study=="VITAL", metabolite %in% names(consistent_feat_key)) %>% tibble::column_to_rownames("Metabolite") 
+  Vital_res = Vital_res[unlist(consistent_feat_key), ] %>% tibble::rownames_to_column("Metabolite") 
+  Vital_NES = Vital_res %>% dplyr::select(Metabolite, NES) %>% dplyr::rename("Mumta-LW"="NES")
+  Vital_p_star = Vital_res %>% dplyr::select(Metabolite, VITAL)  %>% dplyr::rename("Mumta-LW"="VITAL")
+  NES_data = full_join(Misame_NES, Vital_NES) %>% tibble::column_to_rownames("Metabolite") 
+  p_star_data = full_join(Misame_p_star, Vital_p_star) %>% tibble::column_to_rownames("Metabolite") 
+  
+  # Generate heatmap
+  RE_heatmaps2[[each_pathway]] = NES_data %>% Heatmap(
+    cluster_rows = FALSE, cluster_columns = FALSE, column_names_centered = TRUE, 
+    col = colorRamp2(seq(-5, 5, length.out = 101), colorRampPalette(c("purple", "white", "forestgreen"))(101)),
+    name = "NES", show_heatmap_legend = TRUE,
+    column_title = each_pathway, column_names_rot = 0,
+    show_column_names = TRUE, show_row_names = TRUE, row_names_side = "left" , 
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      text_label <- p_star_data[i, j]
+      grid.text(text_label, x, y, gp = gpar(fontsize = 10, col = "black"))
+    }
+  ) %>% as.ggplot()
+}
+
+Figure4C2 = ggarrange(plotlist = rev(RE_heatmaps2), nrow = 1, ncol = 5, common.legend = TRUE)
+Figure4C2
+ggexport(filename = paste0(fig_path, "/Figure_4C2.pdf"), 
+         plot = Figure4C2,
+        width = 16, height = 3.5)
+```

@@ -12,10 +12,12 @@ library(ggplotify) # for saving heatmaps as ggplot objects for ggarrange
 library(epitools) # For risk ratio analysis
 library(zscorer) # for hcaz calculations
 library(purrr) # for complex iteration
+library(fgsea) # for ranked enrichment analysis
+library(GO.db) # For extracting data from GO database 
 
 # Setting paths
 IMiC_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/"
-fig_path <- "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures"
+fig_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures"
 
 # Targeted data LC/MS + micronutrient data
 misame_targeted = read.csv(paste0(IMiC_path, "IMiC/Data/misame_targeted_df_with_ae.csv"), row.names = 1)
@@ -26,21 +28,21 @@ child_targeted = read.csv(paste0(IMiC_path, "IMiC/Data/child_targeted_df_with_ae
 targeted_spec = read.csv(paste0(IMiC_path,  "IMiC/Data/Targeted_metabolomics/metadata/Milk_Component_Spec_full.csv"), row.names = 1)
 
 # Macronutrient data
-misame_macronut.csv <- read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/misame_macronut.csv"),
+misame_macronut.csv = read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/misame_macronut.csv"),
                                 row.names = 1) %>%
   dplyr::rename(SampleID=sampleID)
 
-vital_macronut.csv <- read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/vital_macronut.csv"),
+vital_macronut.csv = read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/vital_macronut.csv"),
                                row.names = 1) %>%
   dplyr::rename(SampleID=sampleID)
-child_macronut.csv <- read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/child_macronut.csv"),
+child_macronut.csv = read.csv(paste0(IMiC_path, "IMiC/Code/machine_learning/child_macronut.csv"),
                                row.names = 1) %>%
   tibble::rownames_to_column('SampleID')
 
 # LC/MS data for top untargeted features and feature annotations
-misame_104_untargeted_feats <- read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/misame_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
-vital_104_untargeted_feats <- read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/vital_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
-child_104_untargeted_feats <- read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/child_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
+misame_104_untargeted_feats = read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/misame_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
+vital_104_untargeted_feats = read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/vital_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
+child_104_untargeted_feats = read.csv(paste0(IMiC_path, 'IMiC/Code/machine_learning/child_untargeted_104.csv'), row.names = 1) %>%dplyr::rename(SampleID=sample_ID)
 
 # Loading MSD data 
 Mis_MSD = read.csv(file = paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Bode/MSD_MISAME.csv"), row.names = 1) %>% tibble::rownames_to_column("SampleID")
@@ -48,9 +50,9 @@ Vit_MSD = read.csv(file = paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/Vit
 Chd_MSD = read.csv(file = paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/Child/Bode/MSD_CHILD.csv"), row.names = 1) %>% tibble::rownames_to_column("SampleID") %>% mutate(SampleID=str_remove(SampleID, "-6$"))
 
 # Loading Parsed metadata
-misame_full_BM_df <- read.delim(file=paste0(IMiC_path, 'IMiC/Data/MISAME/metadata/misame_processed_metadata.tsv'))
-vital_full_BM_df <- read.delim(file=paste0(IMiC_path, 'IMiC/Data/VITAL/metadata/vital_processed_metadata.tsv'))
-child_full_BM_df <- read.delim(file=paste0(IMiC_path, 'IMiC/Data/CHILD/metadata/child_processed_metadata.tsv'))
+misame_full_BM_df = read.delim(file=paste0(IMiC_path, 'IMiC/Data/MISAME/metadata/misame_processed_metadata.tsv'))
+vital_full_BM_df = read.delim(file=paste0(IMiC_path, 'IMiC/Data/VITAL/metadata/vital_processed_metadata.tsv'))
+child_full_BM_df = read.delim(file=paste0(IMiC_path, 'IMiC/Data/CHILD/metadata/child_processed_metadata.tsv'))
 
 # Loading Supporting metadata generated from other notebooks
 misame_supp = read.csv(paste0(IMiC_path, "IMiC/Data/MISAME/metadata/misame_metadata_supp.csv"),
@@ -69,15 +71,15 @@ misame_traj_key = read.csv(paste0(IMiC_path, "IMiC/Data/MISAME/metadata/misame_p
 vital_traj_key = read.csv(paste0(IMiC_path, "IMiC/Data/VITAL/metadata/vital_processed_traj_key.csv"), row.names = 1)
 
 # Raw metadata (for temporal growth analyses)
-misame_metadata <- read.delim(paste0(IMiC_path, "IMiC/Data/MISAME/metadata/MISAME_3_IMiC_analysis.csv"), sep=",")
-vital_metadata <- read.delim(paste0(IMiC_path, "IMiC/Data/VITAL/metadata/VITAL_Lactation_IMiC_analysis (2).csv"), sep=",")
+misame_metadata = read.delim(paste0(IMiC_path, "IMiC/Data/MISAME/metadata/MISAME_3_IMiC_analysis.csv"), sep=",")
+vital_metadata = read.delim(paste0(IMiC_path, "IMiC/Data/VITAL/metadata/VITAL_Lactation_IMiC_analysis (2).csv"), sep=",")
 
 #Joining loaded data and metadata 
 misame_full_meta = full_join(full_join(full_join(misame_full_BM_df, 
                                                  misame_supp %>% dplyr::rename(SubjectID=SUBJIDO)),
                                        misame_supp_margin), misame_traj_key)
 
-Misame_everything <- full_join(full_join(full_join(misame_full_meta, 
+Misame_everything = full_join(full_join(full_join(misame_full_meta, 
                                                    misame_targeted %>% 
                                                      tibble::rownames_to_column('SampleID')),
                                          misame_104_untargeted_feats),
@@ -96,7 +98,7 @@ vital_full_meta = full_join(full_join(full_join(vital_full_BM_df,
                                       vital_supp_margin), 
                             vital_traj_key %>% dplyr::rename(SUBJID=SubjectID))
 
-Vital_everything <- full_join(full_join(full_join(vital_full_meta, 
+Vital_everything = full_join(full_join(full_join(vital_full_meta, 
                                                   vital_targeted %>% 
                                                     tibble::rownames_to_column('SampleID')),
                                         vital_104_untargeted_feats),
@@ -113,7 +115,7 @@ child_full_meta = full_join(full_join(child_full_BM_df,
                                       child_supp %>% dplyr::rename(SubjectID=SUBJIDO), by = "SubjectID"),
                             child_supp_margin)
 
-Child_everything <- full_join(full_join(child_full_meta, 
+Child_everything = full_join(full_join(child_full_meta, 
                                         child_targeted %>% 
                                           tibble::rownames_to_column('SampleID')),
                               child_104_untargeted_feats) %>%
@@ -148,14 +150,14 @@ targeted_cross_WAZ = c('Asp','FLNH','PC.ae.C34.0','g-tocopherol','lysoPC.a.C18.0
 targeted_cross_BEP = c('Leu',"3'SL",'X3.Met.His', 'Lys','HipAcid','TG.16.1_36.1.','B2','TG.18.2_36.0.','LSTb',"6'SL",'Creatinine','B3','Mn','PA','a-tocopherol','K','Bio','B1','p.Cresol.SO4','Cit')
 
 #Month 3 growth velocity calculations
-misame_weight_diff_df_3m <- left_join(misame_metadata, inner_join(
+misame_weight_diff_df_3m = left_join(misame_metadata, inner_join(
   misame_metadata %>% filter(VISIT=="Delivery", is.na(VISIT_R_FL)) %>%dplyr::select(SUBJID, WTKG) %>% dplyr::rename(wt_0=WTKG),
   misame_metadata %>% filter(VISIT=="Post Natal FU M03", is.na(VISIT_R_FL)) %>%dplyr::select(SUBJID, WTKG, AGEDAYS) %>% dplyr::rename(wt_3=WTKG, AGE=AGEDAYS))) %>%
   mutate(delta_weight_3mo = wt_3-wt_0,
          growth_vel_3mo=(1000*log(wt_3/wt_0))/AGE) %>%dplyr::select(SUBJIDO, growth_vel_3mo) %>%
   dplyr::rename(SubjectID=SUBJIDO)
 
-vital_weight_diff_df_3m <- left_join(vital_metadata, inner_join(
+vital_weight_diff_df_3m = left_join(vital_metadata, inner_join(
   vital_metadata %>% filter(VISIT=="Baseline", is.na(VISIT_R_FL)) %>%dplyr::select(SUBJID, WTKG) %>%dplyr::rename(wt_0=WTKG),
   vital_metadata %>% filter(VISIT=="Follow up month 3", is.na(VISIT_R_FL)) %>%dplyr::select(SUBJID, WTKG, AGEDAYS) %>%dplyr::rename(wt_3=WTKG, AGE=AGEDAYS))) %>%
   mutate(delta_weight_3mo = wt_3-wt_0,
@@ -170,15 +172,18 @@ Misame_NA_list = c()
 for (each_feat in colnames(misame_proteomics)) {
   each_col = misame_proteomics[[each_feat]]
   NA_perc = length(each_col[is.na(each_col)])/length(each_col)
-  if (NA_perc > 0.5) {
-    Misame_NA_list <- c(Misame_NA_list, each_feat)
-  }
+  # new_name = misame_protein_meta %>% filter(ProteinIds==each_feat) %>% pull(Gene.Name) 
+  if (NA_perc > 0.5) { # exclude if percent NA is greater than 50%
+    Misame_NA_list = c(Misame_NA_list, each_feat)
+    #} else if (is.na(new_name)) { 
+    #  Misame_NA_list = c(Misame_NA_list, each_feat) # also exclude if gene name is NA
+  } 
 }
 misame_proteomics_filt = misame_proteomics %>% dplyr::select(-Misame_NA_list) %>%
   tibble::rownames_to_column("SampleID")
 
-misame_protein_meta <- misame_protein_meta %>%
-  dplyr::mutate(Gene.Name = ifelse(is.na(Gene.Name), paste0("Unnamed_", ProteinIds), Gene.Name))
+# misame_protein_meta = misame_protein_meta %>%
+#   dplyr::mutate(Gene.Name = ifelse(is.na(Gene.Name), paste0("Unnamed_", ProteinIds), Gene.Name))
 
 misame_proteomics_filt_genes = misame_proteomics_filt %>% tibble::column_to_rownames("SampleID")
 colnames(misame_proteomics_filt_genes) = misame_protein_meta$Gene.Name[match(colnames(misame_proteomics_filt_genes), misame_protein_meta$ProteinIds)]
@@ -186,15 +191,18 @@ colnames(misame_proteomics_filt_genes) = misame_protein_meta$Gene.Name[match(col
 vital_proteomics = read.csv(paste0(IMiC_path, "IMiC/Data/Proteomics/VITAL/Research_Data/PBL_VITAL_L_DIANN_Protein.csv"), row.names = 1)
 vital_protein_meta = read.csv(paste0(IMiC_path, "IMiC/Data/Proteomics/VITAL/Metadata/PBL_VITAL_L_Protein_dictionary.csv"), row.names = 1)
 
-vital_protein_meta <- vital_protein_meta %>%
-  dplyr::mutate(Gene.Name = ifelse(is.na(Gene.Name), paste0("Unnamed_", ProteinIds), Gene.Name))
+# vital_protein_meta = vital_protein_meta %>%
+#   dplyr::mutate(Gene.Name = ifelse(is.na(Gene.Name), paste0("Unnamed_", ProteinIds), Gene.Name))
 
 Vital_NA_list = c()
 for (each_feat in colnames(vital_proteomics)) {
   each_col = vital_proteomics[[each_feat]]
   NA_perc = length(each_col[is.na(each_col)])/length(each_col)
-  if (NA_perc > 0.5) {
-    Vital_NA_list <- c(Vital_NA_list, each_feat)
+  # new_name = vital_protein_meta %>% filter(ProteinIds==each_feat) %>% pull(Gene.Name) 
+  if (NA_perc > 0.5) { # exclude if percent NA is greater than 50%
+    Vital_NA_list = c(Vital_NA_list, each_feat)
+    #} else if (is.na(new_name)) { 
+    #  Vital_NA_list = c(Vital_NA_list, each_feat) # also exclude if gene name is NA
   }
 }
 vital_proteomics_filt = vital_proteomics %>% dplyr::select(-Vital_NA_list) %>%
@@ -203,7 +211,22 @@ vital_proteomics_filt = vital_proteomics %>% dplyr::select(-Vital_NA_list) %>%
 vital_proteomics_filt_genes = vital_proteomics_filt %>% tibble::column_to_rownames("SampleID")
 colnames(vital_proteomics_filt_genes) = vital_protein_meta$Gene.Name[match(colnames(vital_proteomics_filt_genes), vital_protein_meta$ProteinIds)]
 
-Misame_proteome_ready <- left_join(misame_full_BM_df, left_join(misame_targeted %>% tibble::rownames_to_column('SampleID'),
+Misame_proteome_ready = left_join(misame_full_BM_df, left_join(misame_targeted %>% tibble::rownames_to_column('SampleID'),
                                                                 misame_proteomics_filt))
-Vital_proteome_ready <- left_join(vital_full_BM_df, left_join(vital_targeted %>% tibble::rownames_to_column('SampleID'),
+Vital_proteome_ready = left_join(vital_full_BM_df, left_join(vital_targeted %>% tibble::rownames_to_column('SampleID'),
                                                               vital_proteomics_filt))
+
+# Adding Na/K ratio
+Misame_proteome_ready = Misame_proteome_ready %>%
+  #left_join(Misame_everything %>% dplyr::select(SampleID, Protein, Fat)) %>%
+  mutate(Na_K_Ratio = Na/K)
+Vital_proteome_ready = Vital_proteome_ready %>%
+  #left_join(Vital_everything %>% dplyr::select(SampleID, Protein, Fat)) %>%
+  mutate(Na_K_Ratio = Na/K)
+
+Misame_everything = Misame_everything %>% mutate(Na_K_Ratio = Na/K) %>%
+  dplyr::rename("Total_Protein"="Protein") %>%
+  rowwise() %>% mutate(Total_HMO = sum(c_across(X2.FL:DSLNH))) %>% ungroup()
+Vital_everything = Vital_everything %>% mutate(Na_K_Ratio = Na/K) %>%
+  dplyr::rename("Total_Protein"="Protein") %>%
+  rowwise() %>% mutate(Total_HMO = sum(c_across(X2.FL:DSLNH))) %>% ungroup()

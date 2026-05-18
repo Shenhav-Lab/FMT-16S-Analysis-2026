@@ -1,0 +1,76 @@
+---
+title: "Figure S7. Risk of infant illness is elevated in Mumta-LW compared to MISAME"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S7
+``` {r}
+study_df = rbind(Misame_everything %>% dplyr::select(SubjectID, STUDYID, H20_type, any_HOSP, any_DIARR, any_FEVER, any_COUGH, any_VOMIT, any_SICK) %>% unique(),
+                 Vital_everything %>% dplyr::select(SubjectID,  STUDYID, H20_type=H20_binary_type, any_HOSP, any_DIARR, any_FEVER, any_COUGH, any_VOMIT, any_SICK) %>% unique()) %>%
+  mutate(H20_type=H20_type==1, 
+         any_HOSP=any_HOSP==1, 
+         any_DIARR=any_DIARR==1, 
+         any_FEVER=any_FEVER==1, 
+         any_COUGH=any_COUGH==1, 
+         any_VOMIT=any_VOMIT==1, 
+         any_SICK=any_SICK==1) %>% mutate(Mumta=str_detect(STUDYID, "VITAL"))
+
+# Calculate risk for developing adverse growth trajectory 
+illness_risk = rbind(
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_SICK", label ="Any Illness"),
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_HOSP", label ="Any Hospitalization"),
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_DIARR", label ="Any Diarrhea"),
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_FEVER", label ="Any Fever"),
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_COUGH", label ="Any Cough"),
+  get_risk_scores(input_df = study_df, Condition = "Mumta", Exposure = "any_VOMIT", label ="Any Vomiting")
+  ) %>%
+  mutate(Condition = "NA", Study = "NA",
+    Size = factor(case_when(
+      Chisq.P < 1.0e-20 ~ "p<1.0e-20",   # Strongest significance
+      Chisq.P < 1.0e-10  ~ "p<1.0e-10",   # Moderate significance
+      Chisq.P < 0.05  ~ "p<0.001",   # Weak significance
+      TRUE      ~ "ns"), levels= c("ns", "p<0.001", "p<1.0e-10", "p<1.0e-20")))
+
+# Generate top plot
+FigureS7 = ggplot(illness_risk, aes(x = Risk_ratio, y = Outcome, 
+                                     size = Size)) +
+  ggstance::geom_pointrangeh(aes(xmin = CI_lower, xmax = CI_upper), color = "#EE4B2B", fatten = 3) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_size_manual(values = c('ns' = 0.2, 'p<0.001'=0.5, 'p<1.0e-10'=0.75,
+                               'p<1.0e-20'=1)) +
+  labs(x = "Risk Ratio", y = NULL) +
+  ggtitle("Elevated Illness Risk in\nMumta-LW vs. MISAME") +
+  theme_bw(base_size = 13) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        strip.background = element_rect(fill = "grey85"),
+        legend.title = element_text(size = 11),
+        plot.title = element_text(hjust = 0.5, face = "bold")) +
+  labs(size = expression(chi^2 ~ "Significance"))
+FigureS7
+# ggexport(FigureS7, filename= paste0(fig_path, "/FigureS7.png"),
+#          width=400, height=300)
+ggexport(FigureS7, filename=paste0(fig_path, "/FigureS7.pdf"),
+         width=400/72, height=300/72)
+```
+
+

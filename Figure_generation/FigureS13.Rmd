@@ -1,0 +1,95 @@
+---
+title: "Figure S13. Distributions of missing values among targeted LC/MS features"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S13
+``` {r}
+#library(tidyverse)
+Misame_B_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Allen_Lab/Allen_Bvit_MISAME.csv"), row.names = 1) 
+Misame_FSV_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Allen_Lab/Allen_FSV_MISAME.csv"), row.names = 1) 
+Misame_minerals = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Allen_Lab/Allen_ICP_MISAME.csv"), row.names = 1) 
+Misame_Biocrates = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Biocrates/Biocrates_MISAME_Normalized_toALL_NS.csv"), row.names = 1) 
+Misame_HMO = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Bode/HMO_MISAME.csv"), row.names = 1) 
+
+Vital_B_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Allen_Lab/Allen_Bvit_VITAL.csv"), row.names = 1) 
+Vital_FSV_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Allen_Lab/Allen_FSV_VITAL.csv"), row.names = 1) 
+Vital_minerals = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Allen_Lab/Allen_ICP_VITAL.csv"), row.names = 1) 
+Vital_Biocrates = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Biocrates/Biocrates_VITAL_Normalized_toALL_NS.csv"), row.names = 1) 
+Vital_HMO = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Bode/HMO_VITAL.csv"), row.names = 1) 
+
+Child_B_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/CHILD/Allen_Lab/Allen_Bvit_CHILD.csv"), row.names = 1) 
+Child_FSV_vit = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/CHILD/Allen_Lab/Allen_FSV_CHILD.csv"), row.names = 1) 
+Child_minerals = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/CHILD/Allen_Lab/Allen_ICP_CHILD.csv"), row.names = 1) 
+Child_Biocrates = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/CHILD/Biocrates/Biocrates_CHILD_Normalized_toALL_NS.csv"), row.names = 1) 
+Child_HMO = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/CHILD/Bode/HMO_CHILD.csv"), row.names = 1) 
+
+Misame_untargeted_missingness = read.csv(paste0(IMiC_path, "IMiC/Data/MISAME/Sapient_missingness.csv"), row.names = 1)
+Vital_untargeted_missingness = read.csv(paste0(IMiC_path, "IMiC/Data/VITAL/Sapient_missingness.csv"), row.names = 1)
+Child_untargeted_missingness = read.csv(paste0(IMiC_path, "IMiC/Data/CHILD/Sapient_missingness.csv"), row.names = 1)
+
+format_percent = function(x) {paste0(100*round(x, 4), "%")}
+
+report_missingness = function(data, study) {
+  Biocrates = data$Targeted %>% dplyr::select(-Taurine, -Indole)
+  filt_rows = rownames(Biocrates)[rowMeans(is.na(Biocrates)) <= 0.5]
+  Biocrates_ = Biocrates[filt_rows,]
+
+  biocrates_missingess = data.frame(raw_missingness = colMeans(is.na(Biocrates) | Biocrates=="< LOD"),
+                                    filtered_missingness = colMeans(is.na(Biocrates_) | Biocrates_=="< LOD"))
+  plot = ggplot(biocrates_missingess, aes(x=raw_missingness)) + geom_histogram() + geom_vline(xintercept=0.2) + ylab("Count") +
+    theme_minimal() + ggtitle(paste0(study, " Targeted LC/MS")) + xlab("Missingness per Feature")
+
+  return(plot)
+}
+
+misame_data = list("B vitamins" = Misame_B_vit,
+                   "Fat Soluble vitamins" = Misame_FSV_vit,
+                   "Minerals" = Misame_minerals,
+                   "HMOs" = Misame_HMO,
+                   "Targeted" = Misame_Biocrates,
+                   "Untargeted" = Misame_untargeted_missingness)
+vital_data = list("B vitamins" = Vital_B_vit,
+                   "Fat Soluble vitamins" = Vital_FSV_vit,
+                   "Minerals" = Vital_minerals,
+                   "HMOs" = Vital_HMO,
+                   "Targeted" = Vital_Biocrates,
+                  "Untargeted" = Vital_untargeted_missingness)
+child_data = list("B vitamins" = Child_B_vit,
+                   "Fat Soluble vitamins" = Child_FSV_vit,
+                   "Minerals" = Child_minerals,
+                   "HMOs" = Child_HMO,
+                   "Targeted" = Child_Biocrates,
+                  "Untargeted" = Child_untargeted_missingness)
+
+misame_report = report_missingness(data=misame_data, study = "MISAME")
+vital_report = report_missingness(data=vital_data, study = "Mumta-LW")
+child_report = report_missingness(data=child_data, study = "CHILD")
+
+FigureS13 = ggarrange(misame_report, vital_report, child_report, nrow = 1)
+FigureS13
+ggexport(filename = paste0(fig_path, "/FigureS13.pdf"), 
+         plot = FigureS13,
+         width = 10, height = 2)
+```
+
+

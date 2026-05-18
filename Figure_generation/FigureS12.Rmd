@@ -1,0 +1,157 @@
+---
+title: "Figure S12. Pantothenic Acid exhibits the strongest link between severe deficiency and acylcarnitine accumulation among B-vitamins in Mumta-LW"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S12
+``` {r}
+MISAME_Bvit_data = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Processed/allen_b_vit_orig_units.csv"), row.names = 1) %>%
+  tibble::rownames_to_column("SampleID")
+VITAL_Bvit_data = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Processed/allen_b_vit_orig_units.csv"), row.names = 1) %>%
+  tibble::rownames_to_column("SampleID")
+
+MILQ_percentiles_raw = read.csv(paste0(IMiC_path, "IMiC/Data/MILQ_percentiles.csv"))
+MILQ_percentiles = bind_rows(
+  MILQ_percentiles_raw %>% filter(Concentration=="ug/L"),
+  MILQ_percentiles_raw %>% filter(Concentration=="mg/L") %>% 
+    mutate(across(P05:P95, function(x) x * 1000),
+           Concentration="ug/L")) %>% 
+  mutate(Vitamin = ifelse(Vitamin=="Biotin", "Bio", Vitamin)) # Convert name
+
+# }
+
+MILQ_18_31d = MILQ_percentiles %>% filter(Age == "18-31 d") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+MILQ_1_2m = MILQ_percentiles %>% filter(Age == "1-2 m") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+MILQ_3_4m = MILQ_percentiles %>% filter(Age == "3-4 m") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+
+acylcarnitines = c("C2", "C3", "C4", "C5") 
+process_Bvit_MILQ = function(Bvit, BEP_filter = TRUE, var_list = acylcarnitines) {
+  Bvit_merge = function(df, Bvit_data){
+  df = df %>% dplyr::select(SampleID, Timepoint, BEP, acylcarnitines) %>% left_join(Bvit_data) %>%
+    mutate(B12 = B12/1000) # convert pmol/L B12 to uM/L
+  return(df)
+  }
+  if (BEP_filter==TRUE) {
+    misame_df = Bvit_merge(Misame_everything %>% filter(BEP==0), MISAME_Bvit_data)
+    vital_df = Bvit_merge(Vital_everything %>% filter(BEP==0), VITAL_Bvit_data)
+  } else {
+    misame_df = Bvit_merge(Misame_everything, MISAME_Bvit_data)
+    vital_df = Bvit_merge(Vital_everything, VITAL_Bvit_data)
+  }
+
+  dfM1 = misame_df %>% filter(Timepoint==1, !is.na(!!sym(Bvit))) %>% 
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_18_31d['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_18_31d['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_18_31d['P50',Bvit] ~ '25-50%',
+                                      !is.na(!!sym(Bvit)) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit)
+  dfV1 = vital_df %>% filter(Timepoint==1, !is.na(!!sym(Bvit))) %>%
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_1_2m['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_1_2m['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_1_2m['P50',Bvit] ~ '25-50%',
+                                      !is.na(PA) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit) 
+  data = list('MISAME 14-21 Days' = dfM1,
+              'Mumta-LW 42 Days' = dfV1
+              )
+  return(data)
+
+}
+acylcolor = list(C2 = "lavender",
+                 C3 = "lightblue",
+                 C4 = "lightgreen",
+                 C5 = "orange")
+plot_Bvit_MILQ = function(MILQ_results, var, plot_label = FALSE) {
+  plot_list = list()
+  for (plot_title in names(MILQ_results)) {
+    df = MILQ_results[[plot_title]]
+    Bvit = unique(df$Percentile_var)
+    plot_list[[plot_title]] = 
+    p = ggplot(df, aes(x = Percentiles, y= !!sym(var))) + 
+      geom_boxplot(outliers = FALSE, fill = acylcolor[[var]]) + 
+      xlab(paste0(Bvit, " percentiles")) + 
+      geom_jitter(alpha = 0.5, size = 1) + 
+      stat_compare_means(comparisons = list(c("0-10%", "10-25%"),
+                                            c("0-10%", "25-50%"),
+                                           c("0-10%", "50-100%")), label = "p.signif")  +
+     scale_y_continuous(expand = expansion(mult = c(0.1, 0.10))) + theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1 )) 
+    if (plot_label==TRUE) {p = p + ggtitle(plot_title)}
+    plot_list[[plot_title]] = p
+  }
+  p = ggarrange(plotlist = plot_list, nrow = 1, ncol = 2)
+  return(p)
+}
+
+plot_Bvit_MILQ_per_site = function(MILQ_results, var, site, plot_label = FALSE) {
+  plot_list = list()
+  plot_title = site
+  df = MILQ_results[[plot_title]]
+  Bvit = unique(df$Percentile_var)
+  plot_list[[plot_title]] = 
+  p = ggplot(df, aes(x = Percentiles, y= !!sym(var))) + 
+    geom_boxplot(outliers = FALSE, fill = acylcolor[[var]]) + 
+    xlab(paste0(Bvit, " percentiles")) + 
+    geom_jitter(alpha = 0.5, size = 1) + 
+    stat_compare_means(comparisons = list(c("0-10%", "10-25%"),
+                                          c("0-10%", "25-50%"),
+                                         c("0-10%", "50-100%")), label = "p.signif")  +
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.10))) + theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1 )) 
+  if (plot_label==TRUE) {p = p + ggtitle(plot_title)}
+  plot_list[[plot_title]] = p
+  return(p)
+}
+
+Bvit_unsupp_plots = list()
+for (Bvit in c("B1", "B2", "B3", "PA", "B6", "Bio")) {
+  processed_Bvit_data = process_Bvit_MILQ(Bvit, BEP_filter = TRUE)
+  Bvit_unsupp_plots[[Bvit]] = ggarrange(plot_Bvit_MILQ(processed_Bvit_data, "C2"),
+                                        plot_Bvit_MILQ(processed_Bvit_data, "C3"),
+                                        plot_Bvit_MILQ(processed_Bvit_data, "C4"),
+                                        plot_Bvit_MILQ(processed_Bvit_data, "C5"), nrow = 4, ncol = 1)
+}
+Bvit_allmoms_plots = list()
+for (Bvit in c("B1", "B2", "B3", "PA", "B6", "Bio")) {
+  processed_Bvit_data = process_Bvit_MILQ(Bvit, BEP_filter = FALSE)
+  Bvit_allmoms_plots[[Bvit]] = ggarrange(plot_Bvit_MILQ(processed_Bvit_data, "C2"),
+                                         plot_Bvit_MILQ(processed_Bvit_data, "C3"),
+                                         plot_Bvit_MILQ(processed_Bvit_data, "C4"),
+                                         plot_Bvit_MILQ(processed_Bvit_data, "C5"), nrow = 4, ncol = 1)
+} 
+
+B_unsupp_vsacyl_Vital = list()
+for (Bvit in c("B1", "B2", "B3", "PA", "B6", "Bio")) {
+  B_unsupp_vsacyl = process_Bvit_MILQ(Bvit, BEP_filter = TRUE)
+  B_unsupp_vsacyl_Vital[[Bvit]] = ggarrange(plot_Bvit_MILQ_per_site(B_unsupp_vsacyl, "C2", "Mumta-LW 42 Days"),
+                                            plot_Bvit_MILQ_per_site(B_unsupp_vsacyl, "C3", "Mumta-LW 42 Days"),
+                                            plot_Bvit_MILQ_per_site(B_unsupp_vsacyl, "C4", "Mumta-LW 42 Days"),
+                                            plot_Bvit_MILQ_per_site(B_unsupp_vsacyl, "C5", "Mumta-LW 42 Days"),
+                                            nrow = 4, ncol = 1)
+}
+FigureS12 = ggarrange(plotlist = B_unsupp_vsacyl_Vital, ncol = 6, nrow = 1)
+FigureS12
+ggexport(FigureS12, filename = paste0(fig_path, "/FigureS12.pdf"),
+         width = 10, height = 12)
+```
+
+

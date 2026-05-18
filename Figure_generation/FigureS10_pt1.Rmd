@@ -1,5 +1,5 @@
 ---
-title: "Figure S5AC. Joint-RPCA analysis reveals strong link between acylcarnitines and joint growth-supplementation signal"
+title: "Figure S10. Joint-RPCA analysis reveals strong link between acylcarnitines and joint growth-supplementation signal"
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +22,7 @@ source("plotting_setup.R")
 source("plotting_functions.R")
 ```
 
-##Figure S5A
+Figure S10A
 ``` {r}
 # Function for hypergeometric enrichment
 hypergeom_enrichment_v1 = function(ingroup, outgroup, interest_feats, epsilon = 1e-10) {
@@ -123,7 +123,7 @@ Vit_RPCA_hypergeom_df_toplot_Denom = Vital_RPCA_hypergeom_df_Denom %>%
          xmax = ifelse(fold_enrich >1, fold_enrich, 1))
 
 # Plot rankings
-RPCA_enrich_plot = ggarrange(
+FigureS10A = ggarrange(
   ggplot(Mis_RPCA_hypergeom_df_toplot_Denom) +
   geom_rect(aes(ymin = level - 0.4,
                 ymax = level + 0.4,
@@ -203,17 +203,17 @@ RPCA_enrich_plot = ggarrange(
   ggtitle("Bottom Ranked VITAL PC1 Features")
   )
 
-RPCA_enrich_plot
-ggexport(filename = paste0(fig_path, "/FigureS5A.pdf"), plot = RPCA_enrich_plot,
+FigureS10A
+ggexport(filename = paste0(fig_path, "/FigureS10A.pdf"), plot = FigureS10A,
         width = 10.2, height = 4.8)
 ```
 
-## Figure S5C
+## Figure S10C
 ``` {r}
 Misame_everything=Misame_everything %>% mutate(BEPyn=ifelse(Postnatal_BEP==TRUE, "Y", "N"))
 Vital_everything=Vital_everything %>% mutate(BEPyn=ifelse(Postnatal_BEP==TRUE, "Y", "N"))
 
-FigureS5C = ggarrange(
+FigureS10C = ggarrange(
   ggarrange(
   Misame_everything %>% filter(Timepoint==1) %>% mutate(Label="14-21D") %>%
     ggplot(aes(x=BEPyn, y=C3, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE) + facet_grid(.~Label) + 
@@ -310,10 +310,11 @@ FigureS5C = ggarrange(
                        label.y = 0.8) + ylim(0,1) +
     ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
   nrow=1), ncol = 1)
-FigureS5C
+FigureS10C
 
-ggexport(FigureS5C, filename=paste0(fig_path, "/FigureS5C.pdf"),
+ggexport(FigureS10C, filename=paste0(fig_path, "/FigureS10C.pdf"),
          width=7.65, height=9)
 ```
+
 
 

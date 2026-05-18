@@ -177,9 +177,10 @@ prepare_heatmap_matrix <- function(label, heat_list, Protein_key) {
 }
 
 # Function to calculate the correlations to populate the heatmap
-get_heatmap_correlations = function(metab_feats, focus_genes, label, include_H1=FALSE) {
-  data_map <- list(Misame = list(data = Misame_everything, proteins = misame_proteomics_filt_genes),
-                   Vital = list(data = Vital_everything, proteins = vital_proteomics_filt_genes))
+get_heatmap_correlations = function(metab_feats, focus_genes, label, 
+                                    include_H1=FALSE, include_cho=FALSE, include_hmo=FALSE) {
+  data_map <- list(Misame = list(data = Misame_everything, proteins = misame_proteomics_filt_genes, meta = misame_protein_meta),
+                   Vital = list(data = Vital_everything, proteins = vital_proteomics_filt_genes, meta = vital_protein_meta))
   
   if (!label %in% names(data_map)) {
     stop("Unknown label. Please use 'Misame', 'Vital', or 'Child'.")
@@ -187,16 +188,21 @@ get_heatmap_correlations = function(metab_feats, focus_genes, label, include_H1=
   
   chosen_data <- data_map[[label]]
   
-  col_feats <- if (include_H1) c(focus_genes, "H1") else focus_genes
+  col_feats <- focus_genes
+  
+  if (include_H1) {col_feats = c(col_feats, "H1") } 
+  if (include_cho) {col_feats = c(col_feats, "CHO")} # Adds Na:K ratio
+  if (include_hmo) {col_feats = c(col_feats, "Total_HMO")} # Adds Na 
+  
   focus_genes <- focus_genes[focus_genes %in% colnames(chosen_data$proteins)]
   
   A <- chosen_data$data %>%
     filter(SampleID %in% rownames(chosen_data$proteins)) %>%
-    dplyr::select(SampleID, metab_feats, H1)
+    dplyr::select(SampleID, metab_feats, H1, CHO, Total_HMO, Na_K_Ratio, Na) # Adds Na:K ratio and Na
   B <- chosen_data$proteins %>%
+    dplyr::select(focus_genes) %>%
     tibble::rownames_to_column("SampleID") %>%
-    filter(SampleID %in% chosen_data$data$SampleID) %>%
-    dplyr::select(SampleID, focus_genes)
+    filter(SampleID %in% chosen_data$data$SampleID) 
   
   AB <- inner_join(B, A) %>%
     mutate_all(~ str_remove_all(., " ")) %>%
@@ -207,6 +213,55 @@ get_heatmap_correlations = function(metab_feats, focus_genes, label, include_H1=
   corr_r <- cor_matrix$r %>% as.data.frame() %>% dplyr::select(metab_feats) %>%
     filter(rownames(cor_matrix$r) %in% col_feats)
   corr_p <- cor_matrix$P %>% as.data.frame() %>% dplyr::select(metab_feats) %>%
+    filter(rownames(cor_matrix$P) %in% col_feats)
+  
+  return(list(r = corr_r, p = corr_p))
+}
+
+# Protein-vs-protein veresion of get_heatmap_correlations
+get_heatmap_correlations_pvp = function(focus_genes, label, MSD_df = data.frame(), MSD_feats,
+                                        include_H1=FALSE, include_cho=FALSE, include_hmo=FALSE) {
+  
+  data_map <- list(Misame = list(data = Misame_everything, proteins = misame_proteomics_filt_genes, meta = misame_protein_meta),
+                   Vital = list(data = Vital_everything, proteins = vital_proteomics_filt_genes, meta = vital_protein_meta))
+  
+  if (!label %in% names(data_map)) {
+    stop("Unknown label. Please use 'Misame', 'Vital', or 'Child'.")
+  }
+  
+  chosen_data <- data_map[[label]]
+  
+  focus_genes <- focus_genes[focus_genes %in% colnames(chosen_data$proteins)]
+  col_feats <- focus_genes
+  
+  if (include_H1) {col_feats = c(col_feats, "H1") } 
+  if (include_cho) {col_feats = c(col_feats, "CHO")} # Adds Na:K ratio
+  if (include_hmo) {col_feats = c(col_feats, "Total_HMO")} # Adds Na 
+  
+  A <- chosen_data$data %>%
+    filter(SampleID %in% rownames(chosen_data$proteins)) %>%
+    dplyr::select(SampleID, H1, CHO, Total_HMO, Na_K_Ratio, Na) # Adds Na:K ratio and Na
+  B <- chosen_data$proteins %>%
+    dplyr::select(focus_genes) %>%
+    tibble::rownames_to_column("SampleID") %>%
+    filter(SampleID %in% chosen_data$data$SampleID)
+  if (nrow(MSD_df) > 0 ) {
+    col_feats = c(col_feats, MSD_feats)
+    msd = MSD_df %>% 
+      mutate(IgA = ifelse(IgA == "Low Signal", NA, as.numeric(IgA)),
+             Calprotectin = ifelse(Calprotectin == "Low Signal", NA, as.numeric(Calprotectin))) %>% 
+      dplyr::select(SampleID, MSD_feats)
+    A = inner_join(A, msd)
+  }
+  AB <- inner_join(B, A) %>%
+    mutate_all(~ str_remove_all(., " ")) %>%
+    tibble::column_to_rownames("SampleID") %>%
+    as.matrix()
+  
+  cor_matrix <- rcorr(AB, type = "spearman")
+  corr_r <- cor_matrix$r %>% as.data.frame() %>% dplyr::select(col_feats) %>%
+    filter(rownames(cor_matrix$r) %in% col_feats)
+  corr_p <- cor_matrix$P %>% as.data.frame() %>% dplyr::select(col_feats) %>%
     filter(rownames(cor_matrix$P) %in% col_feats)
   
   return(list(r = corr_r, p = corr_p))
@@ -287,12 +342,18 @@ prepare_complete_heatmap_matrix <- function(label, heat_list, Protein_key, prote
   
   return(list(r = final_r, p = final_p))
 }
+
 # Function to render heatmap with color and statistical annotations
 render_heatmap <- function(matrix_r, matrix_p, title, colors) {
   Heatmap(matrix_r,
           cell_fun = function(j, i, x, y, width, height, fill) {
-            # Add annotation for statistically significant results
-            if (!is.na(matrix_p[i, j]) && matrix_p[i, j] < 0.05) {
+            row_name <- rownames(matrix_r)[i]
+            if (row_name %in% c(" ", "  ", "   ")) {
+              return()
+            }
+            if (!is.na(matrix_p[i, j]) && matrix_p[i, j] == -99) {
+              grid.text(sprintf("%.2f", matrix_r[i, j]), x, y, gp = gpar(fontsize = 8))
+            } else if (!is.na(matrix_p[i, j]) && matrix_p[i, j] < 0.05) {
               grid.text(if (matrix_r[i, j] == 0) "" else sprintf("%.2f", matrix_r[i, j]), x, y, gp = gpar(fontsize = 8))
             } else {
               grid.text("ns", x, y, gp = gpar(fontsize = 8))
@@ -305,4 +366,16 @@ render_heatmap <- function(matrix_r, matrix_p, title, colors) {
           column_names_rot = -45,
           col = colors
   )
+}
+
+# Function to convert p-values to astrices
+pval_to_stars <- function(p) {
+  sapply(p, function(x) {
+    if (is.na(x)) return(NA)
+    if (x < 0.001) return("***")
+    if (x < 0.01) return("**")
+    if (x < 0.05) return("*")
+    if (x < 0.1) return(".")
+    return("")
+  })
 }

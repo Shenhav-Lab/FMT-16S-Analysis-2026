@@ -1,0 +1,635 @@
+---
+title: "Figure 6A-D and F-G. C5 serves as a central biomarker of mammary gland function and infant growth, may be causally linked to low levels of Pantothenic Acid"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+Set acylcarnitine color scheme for the figure
+``` {r}
+acylcolor = list(C2 = "lavender",
+                 C3 = "lightblue",
+                 C4 = "lightgreen",
+                 C5 = "orange")
+```
+
+## Figure 6A
+``` {r}
+# Extract B-casein accession
+CSN2 = misame_protein_meta %>% filter(Gene.Name=="CSN2") %>% pull(ProteinIds)
+
+
+# Split acylcarnitine data into quintiles per study/timepoint
+cut_quntiles = function(df, var) {
+  df = df %>% mutate(percentile = cut(!!sym(var), 
+                             breaks = quantile(!!sym(var), probs = 0:5 / 5, na.rm = TRUE), 
+                             include.lowest = TRUE, 
+                             labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%"))) %>%
+  filter(!is.na(!!sym(var)), percentile %in% c("0-20%", "80-100%"))
+}
+
+# Build B-casein boxplots
+CSN2_boxplots = list("MISAME", "Mumta-LW")
+for (acylcarnitine in c("C2", "C3", "C4", "C5")) {
+  misame_plot = Misame_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = !!sym(CSN2))) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("CSN2") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  vital_plot = Vital_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = !!sym(CSN2))) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("CSN2") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  if (acylcarnitine == "C2") {
+    misame_plot = misame_plot + ggtitle("MISAME") + theme(plot.title = element_text(hjust = 0.5))
+    vital_plot = vital_plot + ggtitle("Mumta-LW") + theme(plot.title = element_text(hjust = 0.5))
+  }
+  CSN2_boxplots[["MISAME"]][[acylcarnitine]] = misame_plot
+  CSN2_boxplots[["Mumta-LW"]][[acylcarnitine]] = vital_plot
+}
+
+# Build total carbohydrate boxplots
+CHO_boxplots = list("MISAME", "Mumta-LW")
+for (acylcarnitine in c("C2", "C3", "C4", "C5")) {
+  misame_plot = Misame_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    left_join(Misame_everything %>% dplyr::select(SampleID, CHO) %>% unique()) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = CHO)) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("Carbohydrates") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  vital_plot = Vital_proteome_ready %>% 
+    filter(Timepoint==2) %>%
+    left_join(Vital_everything %>% dplyr::select(SampleID, CHO) %>% unique()) %>%
+    cut_quntiles(acylcarnitine) %>%
+    ggplot(aes(x = percentile, y = CHO)) + geom_boxplot(fill = acylcolor[[acylcarnitine]], outliers = FALSE) + 
+    stat_compare_means(comparisons = list(c("0-20%", "80-100%")), label = "p.signif") +
+    ylab("Carbohydrates") + xlab(acylcarnitine) + theme_minimal() + geom_jitter(alpha = 0.5, size = 1) + 
+    scale_y_continuous(expand = expansion(mult = c(0.1, 0.2)))
+  if (acylcarnitine == "C2") {
+    misame_plot = misame_plot + ggtitle("MISAME") + theme(plot.title = element_text(hjust = 0.5))
+    vital_plot = vital_plot + ggtitle("Mumta-LW") + theme(plot.title = element_text(hjust = 0.5))
+  }
+  CHO_boxplots[["MISAME"]][[acylcarnitine]] = misame_plot
+  CHO_boxplots[["Mumta-LW"]][[acylcarnitine]] = vital_plot
+}
+
+Figure6A1 = ggarrange(ggarrange(plotlist = CSN2_boxplots[["MISAME"]], ncol = 1, nrow = 4),
+                      ggarrange(plotlist = CSN2_boxplots[["Mumta-LW"]], ncol = 1, nrow = 4))
+
+Figure6A2 = ggarrange(ggarrange(plotlist = CHO_boxplots[["MISAME"]], ncol = 1, nrow = 4),
+                      ggarrange(plotlist = CHO_boxplots[["Mumta-LW"]], ncol = 1, nrow = 4))
+
+ggexport(filename = paste0(fig_path, "/Figure6A1.pdf"), 
+         plot = Figure6A1,
+         width = 4, height = 8)
+ggexport(filename = paste0(fig_path, "/Figure6A2.pdf"), 
+         plot = Figure6A2,
+         width = 4, height = 8)
+```
+## Figure 6B
+``` {r}
+# Extracting processed B-vitamin data (in original units)
+MISAME_Bvit_data = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/MISAME/Processed/allen_b_vit_orig_units.csv"), row.names = 1) %>%
+  tibble::rownames_to_column("SampleID")
+VITAL_Bvit_data = read.csv(paste0(IMiC_path, "IMiC/Data/Targeted_metabolomics/VITAL/Processed/allen_b_vit_orig_units.csv"), row.names = 1) %>%
+  tibble::rownames_to_column("SampleID")
+
+# Extracting MILQ data (from DOI: 10.1016/j.advnut.2025.100500)
+MILQ_percentiles_raw = read.csv(paste0(IMiC_path, "IMiC/Data/MILQ_percentiles.csv"))
+MILQ_percentiles = bind_rows(
+  MILQ_percentiles_raw %>% filter(Concentration=="ug/L"),
+  MILQ_percentiles_raw %>% filter(Concentration=="mg/L") %>% 
+    mutate(across(P05:P95, function(x) x * 1000),
+           Concentration="ug/L")) %>% 
+  mutate(Vitamin = ifelse(Vitamin=="Biotin", "Bio", Vitamin)) # Convert name
+
+MILQ_18_31d = MILQ_percentiles %>% filter(Age == "18-31 d") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+MILQ_1_2m = MILQ_percentiles %>% filter(Age == "1-2 m") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+MILQ_3_4m = MILQ_percentiles %>% filter(Age == "3-4 m") %>% tibble::column_to_rownames("Vitamin") %>% dplyr::select(P05:P95) %>% t()
+
+# Define acylcarnitines
+acylcarnitines = c("C2", "C3", "C4", "C5") 
+
+# Function to generate percentile datasets for plotting B-vitamin deficiency vs. acylcarnitines
+process_Bvit_MILQ = function(Bvit, BEP_filter = TRUE, var_list = acylcarnitines, all = FALSE) {
+  Bvit_merge = function(df, Bvit_data){
+  df = df %>% dplyr::select(SampleID, Timepoint, BEP, acylcarnitines) %>% left_join(Bvit_data) %>%
+    mutate(B12 = B12/1000) # convert pmol/L B12 to uM/L
+  return(df)
+  }
+  if (BEP_filter==TRUE) {
+    misame_df = Bvit_merge(Misame_everything %>% filter(BEP==0), MISAME_Bvit_data)
+    vital_df = Bvit_merge(Vital_everything %>% filter(BEP==0), VITAL_Bvit_data)
+  } else {
+    misame_df = Bvit_merge(Misame_everything, MISAME_Bvit_data)
+    vital_df = Bvit_merge(Vital_everything, VITAL_Bvit_data)
+  }
+
+  dfM1 = misame_df %>% filter(Timepoint==1, !is.na(!!sym(Bvit))) %>% 
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_18_31d['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_18_31d['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_18_31d['P50',Bvit] ~ '25-50%',
+                                      !is.na(!!sym(Bvit)) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit)
+  dfM2 =misame_df %>% filter(Timepoint==2, !is.na(!!sym(Bvit))) %>%
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_1_2m['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_1_2m['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_1_2m['P50',Bvit] ~ '25-50%',
+                                      !is.na(!!sym(Bvit)) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit)  
+  dfM3= misame_df %>% filter(Timepoint==3, !is.na(!!sym(Bvit))) %>%
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_3_4m['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_3_4m['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_3_4m['P50',Bvit] ~ '25-50%',
+                                      !is.na(!!sym(Bvit)) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit) 
+  dfV1 = vital_df %>% filter(Timepoint==1, !is.na(!!sym(Bvit))) %>%
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_1_2m['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_1_2m['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_1_2m['P50',Bvit] ~ '25-50%',
+                                      !is.na(PA) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit) 
+   
+  dfV2 = vital_df %>% filter(Timepoint==2, !is.na(!!sym(Bvit))) %>%
+    mutate(Percentiles = case_when(!!sym(Bvit)<MILQ_1_2m['P10',Bvit] ~ '0-10%',
+                                      !!sym(Bvit)<MILQ_1_2m['P25',Bvit] ~ '10-25%',
+                                      !!sym(Bvit)<MILQ_1_2m['P50',Bvit] ~ '25-50%',
+                                      !is.na(!!sym(Bvit)) ~ '50-100%',
+                                      TRUE ~ NA), Percentile_var = Bvit) 
+  
+
+  
+  if (all==TRUE) {
+    data = list('MISAME 14-21 Days' = dfM1,
+                'MISAME 1-2 Months' = dfM2,
+                'MISAME 3-4 Months' = dfM3,
+                'Mumta-LW 42 Days' = dfV1,
+                'Mumta-LW 56 Days' = dfV2
+    ) 
+  } else {
+    data = list('MISAME 14-21 Days' = dfM1,
+                'Mumta-LW 42 Days' = dfV1
+    ) 
+  }
+    
+  return(data)
+
+}
+
+# Function to plot MILQ results
+plot_Bvit_MILQ = function(MILQ_results, var, plot_label = FALSE) {
+  plot_list = list()
+  for (plot_title in names(MILQ_results)) {
+    df = MILQ_results[[plot_title]]
+    Bvit = unique(df$Percentile_var)
+    plot_list[[plot_title]] = 
+    p = ggplot(df, aes(x = Percentiles, y= !!sym(var))) + 
+      geom_boxplot(outliers = FALSE, fill = acylcolor[[var]]) + 
+      xlab(paste0(Bvit, " percentiles")) + 
+      geom_jitter(alpha = 0.5, size = 1) + 
+      stat_compare_means(comparisons = list(c("0-10%", "10-25%"),
+                                            c("0-10%", "25-50%"),
+                                           c("0-10%", "50-100%")), label = "p.signif")  +
+     scale_y_continuous(expand = expansion(mult = c(0.1, 0.10))) + theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1 )) 
+    if (plot_label==TRUE) {p = p + ggtitle(plot_title)}
+    plot_list[[plot_title]] = p
+  }
+  p = ggarrange(plotlist = plot_list, nrow = 1, ncol = 2)
+  return(p)
+}
+
+# Plot associations for Pantothenic Acid
+PA_unsupp_vsacyl = process_Bvit_MILQ("PA", BEP_filter = TRUE)
+Figure6B = ggarrange(plot_Bvit_MILQ(PA_unsupp_vsacyl, "C2"),
+                          plot_Bvit_MILQ(PA_unsupp_vsacyl, "C3"),
+                          plot_Bvit_MILQ(PA_unsupp_vsacyl, "C4"),
+                          plot_Bvit_MILQ(PA_unsupp_vsacyl, "C5"), nrow = 4, ncol = 1)
+Figure6B
+ggexport(filename = paste0(fig_path, "/Figure6B.pdf"), 
+         plot = Figure6B,
+         width = 3, height = 10)
+```
+## Figure 6C
+``` {r}
+# Function to summarize MILQ results
+summarize_BEP_Bvit = function(MILQ_results) {
+  res = data.frame()
+  for (label in names(MILQ_results)) {
+    study_name = str_remove(label, " .*")
+    TP = str_remove(label, "[A-Z\\-a-z]* ")
+    df = MILQ_results[[label]]
+    Bvit = unique(df$Percentile_var)
+    row = df %>% group_by(BEP) %>% 
+      dplyr::summarize(study = study_name,
+                       Timepoint = TP,
+                       Vitamin = Bvit,
+                       'total' = n(),
+                       '0-10%' = sum(Percentiles=='0-10%'),
+                       '10-25%' = sum(Percentiles=='10-25%'),
+                       '25-50%' = sum(Percentiles=='25-50%'),
+                       '50-100%' = sum(Percentiles=='50-100%')
+                       )
+    res = rbind(res, row)
+  }
+    return(res)
+}
+
+# Process deficiency data across the B-vitamins
+Bvit_deficiencies = bind_rows(process_Bvit_MILQ("B1", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit(),
+                              process_Bvit_MILQ("B2", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit(),
+                              process_Bvit_MILQ("B3", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit(),
+                              process_Bvit_MILQ("PA", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit(),
+                              process_Bvit_MILQ("B6", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit(),
+                              process_Bvit_MILQ("Bio", BEP_filter = FALSE, all = TRUE)  %>% summarize_BEP_Bvit())
+Bvit_RR_results = data.frame()
+for (each_study in unique(Bvit_deficiencies$study)) {
+  study_data = Bvit_deficiencies %>% filter(study == each_study)
+  for (each_Timepoint in unique(study_data$Timepoint)) {
+    for (each_Bvit in unique(study_data$Vitamin)) {
+      contingency_table = study_data %>% filter(Vitamin == each_Bvit, Timepoint == each_Timepoint) %>% 
+        rowwise() %>% mutate(`10-100%` = sum(c(`10-25%`, `25-50%`, `50-100%`))) %>% ungroup() %>% 
+        tibble::column_to_rownames("BEP") %>% 
+        dplyr::select(`10-100%`, `0-10%`) 
+      result = riskratio(as.matrix(contingency_table))
+      RR = result$measure[2,"estimate"]
+      upper_95 = result$measure[2,"upper"]
+      lower_95 = result$measure[2,"lower"]
+      chisq_result = chisq.test(contingency_table, correct = FALSE)
+      chisq = unname(chisq_result$statistic)
+      pval = unname(chisq_result$p.value)
+      row = data.frame(Vitamin = each_Bvit, study = each_study, Timepoint = each_Timepoint, p = pval, Risk_ratio = RR, CI_upper = upper_95, CI_lower = lower_95, chisq = chisq)
+      Bvit_RR_results = rbind(Bvit_RR_results,row)
+    }
+  }
+}
+Bvit_RR_results = Bvit_RR_results %>% 
+  mutate(Size = case_when(p<0.001 ~ 'p<0.001',
+                          p<0.01 ~ 'p<0.01',
+                          p<0.05 ~ 'p<0.05',
+                          p>=0.05 ~ 'ns',
+                          TRUE ~ NA),
+         Vitamin = factor(Vitamin, levels = c("B1", "B2", "B3", "B6", "Bio", "PA")))
+
+# Build Figure
+Figure6C = ggarrange(
+  Bvit_RR_results %>% filter(study=="MISAME", !is.na(p)) %>% 
+           mutate(Timepoint = factor(Timepoint, 
+                                     levels = c('14-21 Days', '1-2 Months', '3-4 Months'))) %>%
+    ggplot(aes(x = Risk_ratio, y = Vitamin,
+                                         size = Size)) +
+    ggstance::geom_pointrangeh(aes(xmin = CI_lower, xmax = CI_upper), color = "#EE4B2B", fatten = 3) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    scale_size_manual(values = c('ns' = 0.2, 'p<0.05'=0.4, 'p<0.01'=0.6,
+                                 'p<0.001'=0.8)) +
+    labs(x = "Risk Ratio", y = NULL) +
+    ggtitle("MISAME Severe Deficiency Risk") +
+    theme_bw(base_size = 13) +
+    theme(legend.title = element_text(size = 11),
+          plot.title = element_text(hjust = 0.5, face = "bold")) +
+    labs(size = expression(chi^2 ~ "Significance")) +
+    scale_x_log10(breaks = c(1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8),
+                  labels = c("1/16", "1/8", "1/4", "1/2", "1", "2", "4", "8")) +
+    facet_grid(Timepoint~.),
+  Bvit_RR_results %>% filter(study=="Mumta-LW", !is.na(p)) %>% 
+    mutate(Timepoint = factor(Timepoint, levels = c('42 Days', '56 Days'))) %>%
+    ggplot(aes(x = Risk_ratio, y = Vitamin,
+                                         size = Size)) +
+    ggstance::geom_pointrangeh(aes(xmin = CI_lower, xmax = CI_upper), color = "#EE4B2B", fatten = 3) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    scale_size_manual(values = c('ns' = 0.2, 'p<0.05'=0.4, 'p<0.01'=0.6,
+                                 'p<0.001'=0.8)) +
+    labs(x = "Risk Ratio", y = NULL) +
+    ggtitle("Mumta-LW Severe Deficiency Risk") +
+    theme_bw(base_size = 13) +
+    theme(legend.title = element_text(size = 11),
+          plot.title = element_text(hjust = 0.5, face = "bold")) +
+    labs(size = expression(chi^2 ~ "Significance")) +
+    scale_x_log10(breaks = c(1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8),
+                  labels = c("1/16", "1/8", "1/4", "1/2", "1", "2", "4", "8")) +
+    facet_grid(Timepoint~.),
+  ncol = 1, nrow = 2, heights = c(3, 2.25))
+   
+ggexport(filename = paste0(fig_path, "/Figure6C.pdf"), 
+         plot = Figure6C,
+         width = 6, height = 6.5)
+```
+
+## Figure 6D 
+``` {r}
+# Function for hypergeometric enrichment
+hypergeom_enrichment_v1 = function(ingroup, outgroup, interest_feats, epsilon = 1e-10) {
+  pop = unique(c(ingroup,outgroup))
+    
+  successes_in_sample = length(ingroup[ingroup %in% interest_feats])
+  sample_size = length(ingroup)
+  
+  successes_in_pop = length(pop[pop %in% interest_feats])
+  failiures_in_pop = length(pop[!pop %in% interest_feats])
+    
+  p = phyper(successes_in_sample-1, successes_in_pop, failiures_in_pop, sample_size, lower.tail = FALSE)
+  interest_perc = successes_in_sample/sample_size
+  noninterest_perc = successes_in_pop/(successes_in_pop+failiures_in_pop)
+
+  enrich_label = ifelse(successes_in_sample == 0, "absent",
+                        ifelse(interest_perc > noninterest_perc, "enrichment", "depletion"))
+  Fold_enrichment = interest_perc/noninterest_perc
+  
+  if (length(ingroup[ingroup %in% interest_feats])==0) {p=NA}
+  return(c(p, enrich_label, Fold_enrichment))
+}
+
+# Define metab categories
+Metab_cat_list = list()
+Metab_cat_list[["HMO"]] = targeted_spec %>% filter(VarCategory=="HMO") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Mineral"]] = targeted_spec %>% filter(VarCategory=="Mineral") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Vitamins"]] = targeted_spec %>% filter(VarCategory %in% c("FSV vitamins", "B vitamins")) %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Amino Acid Related"]] = targeted_spec %>% filter(VarSubCategory=="Amino Acid Related") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Indoles and Derivatives"]] = targeted_spec %>% filter(VarSubCategory=="Indoles and Derivatives") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Fatty Acids"]] = targeted_spec %>% filter(VarSubCategory=="Fatty Acids") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Carboxylic Acids"]] = targeted_spec %>% filter(VarSubCategory=="Carboxylic Acids") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Amino Acids"]] = targeted_spec %>% filter(VarSubCategory=="Amino Acids") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Biogenic Amines"]] = targeted_spec %>% filter(VarSubCategory=="Biogenic Amines") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Acylcarnitines"]] = targeted_spec %>% filter(VarSubCategory=="Acylcarnitines") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Bile Acids"]] = targeted_spec %>% filter(VarSubCategory=="Bile Acids") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Cholesteryl Esters"]] = targeted_spec %>% filter(VarSubCategory=="Cholesteryl Esters") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Ceramides"]] = targeted_spec %>% filter(VarSubCategory=="Ceramides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Dihydroceramides"]] = targeted_spec %>% filter(VarSubCategory=="Dihydroceramides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Diglycerides"]] = targeted_spec %>% filter(VarSubCategory=="Diglycerides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Carbohydrates and Related"]] = targeted_spec %>% filter(VarSubCategory=="Carbohydrates and Related") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Dihexosylceramides"]] = targeted_spec %>% filter(VarSubCategory=="Dihexosylceramides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Trihexosylceramides"]] = targeted_spec %>% filter(VarSubCategory=="Trihexosylceramides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Nucleobases and Related"]] = targeted_spec %>% filter(VarSubCategory=="Nucleobases and Related") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Lysophosphatidylcholines"]] = targeted_spec %>% filter(VarSubCategory=="Lysophosphatidylcholines") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Cresols"]] = targeted_spec %>% filter(VarSubCategory=="Cresols") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Phosphatidylcholines"]] = targeted_spec %>% filter(VarSubCategory=="Phosphatidylcholines") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Sphingomyelins"]] = targeted_spec %>% filter(VarSubCategory=="Sphingomyelins") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Triglycerides"]] = targeted_spec %>% filter(VarSubCategory=="Triglycerides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Amine Oxides"]] = targeted_spec %>% filter(VarSubCategory=="Amine Oxides") %>% pull(VarName) %>% make.names()
+Metab_cat_list[["Alkaloids"]] = targeted_spec %>% filter(VarSubCategory=="Alkaloids") %>% pull(VarName) %>% make.names()
+
+# Preprocess Joint-RPCA ranked feature data
+Misame_RPCA_bioc_Denom = Misame_ord_biocrates %>% filter(Log_Ratio=="Yes", Log_Ratio_Annot=="Denom") %>% rownames()
+
+Misame_RPCA_hypergeom_df_Denom = data.frame(pathway=character(), p=numeric(), enrich=character(), log_enrich=numeric())
+for (each_cat in names(Metab_cat_list)) {
+  enrich_feats = rownames(Misame_ord_biocrates)[rownames(Misame_ord_biocrates) %in% Metab_cat_list[[each_cat]]]
+  if (length(enrich_feats)>2) {
+    hypergeom_res = hypergeom_enrichment_v1(Misame_RPCA_bioc_Denom,
+                   rownames(Misame_ord_biocrates)[!rownames(Misame_ord_biocrates) %in% Misame_RPCA_bioc_Denom],
+                   enrich_feats)
+    Misame_RPCA_hypergeom_df_Denom = rbind(Misame_RPCA_hypergeom_df_Denom, data.frame(pathway=each_cat, p=hypergeom_res[1],
+                                                    enrich=hypergeom_res[2], fold_enrich=hypergeom_res[3]))
+  }
+}
+
+
+Vital_RPCA_bioc_Denom = Vital_ord_biocrates %>% filter(Log_Ratio=="Yes", Log_Ratio_Annot=="Denom") %>% rownames()
+
+Vital_RPCA_hypergeom_df_Denom = data.frame(pathway=character(), p=numeric(), enrich=character(), log_enrich=numeric())
+for (each_cat in names(Metab_cat_list)) {
+  enrich_feats = rownames(Vital_ord_biocrates)[rownames(Vital_ord_biocrates) %in% Metab_cat_list[[each_cat]]]
+  if (length(enrich_feats)>2) {
+    hypergeom_res = hypergeom_enrichment_v1(Vital_RPCA_bioc_Denom,
+                   rownames(Vital_ord_biocrates)[!rownames(Vital_ord_biocrates) %in% Vital_RPCA_bioc_Denom],
+                   enrich_feats)
+    Vital_RPCA_hypergeom_df_Denom = rbind(Vital_RPCA_hypergeom_df_Denom, data.frame(pathway=each_cat, p=hypergeom_res[1],
+                                                    enrich=hypergeom_res[2], fold_enrich=hypergeom_res[3]))
+  }
+}
+
+# RPCA_hypergeom_cats_to_plot = unique(c(Vital_RPCA_hypergeom_df_Denom %>% filter(p<0.05) %>% pull(pathway), 
+#                                        Misame_RPCA_hypergeom_df_Denom %>% filter(p<0.05) %>% pull(pathway))) %>% sort() %>% rev()
+RPCA_hypergeom_cats_to_plot = rev(c("Sphingomyelins", "Acylcarnitines", "Ceramides", 
+                                    "Dihexosylceramides", "Amino Acid Related", "Biogenic Amines" ))
+
+Mis_RPCA_hypergeom_df_toplot_Denom = Misame_RPCA_hypergeom_df_Denom %>%
+  mutate(p.adjust = p.adjust(as.numeric(p), method = "BH"),
+         fold_enrich = as.numeric(fold_enrich)) %>% 
+  arrange(desc(fold_enrich)) %>%
+  filter(pathway %in% RPCA_hypergeom_cats_to_plot) %>%
+  arrange(desc(row_number())) %>%
+  mutate(pathway = factor((pathway), levels = (pathway)),
+         level = as.numeric(factor(pathway)),
+         xmin = ifelse(fold_enrich > 1, 1, fold_enrich),
+         xmax = case_when(fold_enrich > 1 ~ fold_enrich,
+                          fold_enrich == 0 ~ NA_real_,
+                          TRUE ~ 1)) %>% 
+  mutate(study = "MISAME")
+
+Vit_RPCA_hypergeom_df_toplot_Denom = Vital_RPCA_hypergeom_df_Denom %>%
+  mutate(p.adjust = p.adjust(as.numeric(p), method = "BH"),
+         fold_enrich = as.numeric(fold_enrich)) %>% 
+  arrange(desc(fold_enrich)) %>%
+  filter(pathway %in% RPCA_hypergeom_cats_to_plot) %>%
+  arrange(desc(row_number())) %>%
+  mutate(pathway = factor((pathway), levels = (pathway)),
+         level = as.numeric(factor(pathway)),
+         xmin = ifelse(fold_enrich > 1, 1, fold_enrich),
+         xmax = case_when(fold_enrich > 1 ~ fold_enrich,
+                          fold_enrich == 0 ~ NA_real_,
+                          TRUE ~ 1)) %>% 
+  mutate(study = "Mumta-LW")
+
+RPCA_hypergeom_df_toplot_Denom = full_join(Mis_RPCA_hypergeom_df_toplot_Denom, Vit_RPCA_hypergeom_df_toplot_Denom) %>%
+  mutate(pathway = factor(pathway, levels = RPCA_hypergeom_cats_to_plot),
+         level = as.numeric(pathway))
+
+# Plot rankings
+Figure6D = ggplot(RPCA_hypergeom_df_toplot_Denom) +
+  geom_rect(aes(ymin = level - 0.4,
+                ymax = level + 0.4,
+                xmin = as.numeric(xmin),
+                xmax = as.numeric(xmax),
+                color = enrich,
+                fill = ifelse(as.numeric(p) < 0.05,
+                          ifelse(as.numeric(fold_enrich)>0, "blue", "red"), FALSE))) +
+  geom_text(
+    data = subset(RPCA_hypergeom_df_toplot_Denom, as.numeric(p) < 0.05 & as.numeric(fold_enrich) > 0),
+    aes(x = 1, y = level, label = paste("p =", signif(as.numeric(p), 3))),
+    vjust = 0.5, hjust = -0.1, color = "black"
+  ) +
+  geom_text(
+    data = subset(RPCA_hypergeom_df_toplot_Denom, as.numeric(p) < 0.05 & as.numeric(fold_enrich) < 0),
+    aes(x = 1, y = level, label = paste("p =", signif(as.numeric(p), 3))),
+    vjust = 0.5, hjust = 1.05, color = "black"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+  xlab("Fold Enrichment") + 
+  ylab("Pathway") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text.x = element_text(size = 10),
+        axis.title.x = element_text(size = 12),
+        legend.position = "none") +
+  scale_fill_manual(values = c("blue" = "#00BFC4", "red" = "#F8766D", "FALSE" = "white")) + 
+  scale_color_manual(values = c("enrichment" = "#00BFC4", "depletion" = "#F8766D", "absent" = "gray")) +
+  scale_x_continuous(breaks = seq(min(as.numeric(RPCA_hypergeom_df_toplot_Denom$fold_enrich), na.rm=TRUE), 
+                                   max(as.numeric(RPCA_hypergeom_df_toplot_Denom$fold_enrich), na.rm=TRUE), by = 1)) +
+  scale_y_continuous(breaks = RPCA_hypergeom_df_toplot_Denom$level,
+                     labels = RPCA_hypergeom_df_toplot_Denom$pathway) +
+  facet_grid(.~study, scales = "free_y") +
+  ggtitle("Bottom Ranked PC1 Features")
+
+Figure6D
+ggexport(filename = paste0(fig_path, "/Figure6D.pdf"), plot = Figure6D,
+        width = 8, height = 2.5)
+```
+
+## Figure 6E can be found in Figure6_pt2.ipynb
+
+## Figure 6F: Effect of BEP on C5 levels (box-plot)
+``` {r}
+Figure6F = ggarrange(
+  Misame_everything %>% filter(Timepoint==1) %>% 
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE, outliers = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") + geom_jitter(show.legend = FALSE, alpha = 0.2) +
+    ggtitle("MISAME") + xlab("Postnatal BEP") + theme_minimal(),
+  Misame_everything %>% filter(Timepoint==2) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE, outliers = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") + geom_jitter(show.legend = FALSE, alpha = 0.2) +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  Misame_everything %>% filter(Timepoint==3) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE, outliers = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") + geom_jitter(show.legend = FALSE, alpha = 0.2) +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  Vital_everything %>% filter(Timepoint==1) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE, outliers = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") + geom_jitter(show.legend = FALSE, alpha = 0.2) +
+    ggtitle("Mumta-LW") + xlab("Postnatal BEP") + theme_minimal(),
+  Vital_everything %>% filter(Timepoint==2) %>%
+    mutate(Postnatal_BEP=factor(ifelse(Postnatal_BEP==TRUE, "Yes", "No"), c("Yes", "No"))) %>%
+    ggplot(aes(x=Postnatal_BEP, y=C5, fill=Postnatal_BEP)) + geom_boxplot(show.legend = FALSE, outliers = FALSE) + facet_grid(.~Timepoint) + 
+    stat_compare_means(comparisons = list(c("Yes", "No")), 
+                       method = "wilcox", label = "p.signif") + geom_jitter(show.legend = FALSE, alpha = 0.2) +
+    ggtitle("") + xlab("Postnatal BEP") + theme_minimal(),
+  nrow=1)
+
+Figure6F
+ggexport(Figure6F, filename=paste0(fig_path, "/Figure6F.pdf"),
+         width=7.3, height=3)
+```
+## Figure 6G: Pantothenic acid distributions per study
+``` {r}
+PA_conversion = function(Age_range, percentile) {
+  MM = 219.23 # g/mol PA
+  threshold_ug.L =  MILQ_percentiles %>% 
+    filter(Vitamin=="PA", Age==Age_range) %>% 
+    pull(!!sym(percentile)) 
+  threshold_uM = threshold_ug.L/MM
+  return(threshold_uM)
+}
+
+PA_dist_MISAME = Misame_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA, BEP) %>%
+  mutate(PA_threshold_P50 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "18-31 d", percentile = "P50"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50"),
+                                      Timepoint==3 ~ PA_conversion(Age_range = "3-4 m", percentile = "P50")),
+         PA_threshold_P10 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "18-31 d", percentile = "P10"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10"),
+                                      Timepoint==3 ~ PA_conversion(Age_range = "3-4 m", percentile = "P10"))) %>%
+  ggplot(aes(x=PA, color = as.factor(BEP))) + 
+    geom_density(size=1) + ggtitle("MISAME") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+    geom_vline(aes(xintercept = PA_threshold_P50), linetype = "dashed", color = "black", size = 1) + 
+    geom_vline(aes(xintercept = PA_threshold_P10), linetype = "dashed", color = "darkgray", size = 1) +
+    facet_grid(TP_label~.)
+
+PA_dist_VITAL = Vital_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA, BEP) %>%
+  mutate(PA_threshold_P50 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50")),
+         PA_threshold_P10 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10"))) %>%
+  ggplot(aes(x=PA, color = as.factor(BEP))) + 
+    geom_density(size=1) + ggtitle("Mumta-LW") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+    geom_vline(aes(xintercept = PA_threshold_P50), linetype = "dashed", color = "black", size = 1) + 
+    geom_vline(aes(xintercept = PA_threshold_P10), linetype = "dashed", color = "darkgray", size = 1) +
+    facet_grid(TP_label~.)
+PA_dist_CHILD = Child_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA) %>%
+  mutate(PA_threshold_P50 = PA_conversion(Age_range = "3-4 m", percentile = "P50"),
+         PA_threshold_P10 = PA_conversion(Age_range = "3-4 m", percentile = "P10")) %>%
+  ggplot(aes(x=PA)) + 
+    geom_density(size=1) + ggtitle("CHILD") + xlab("Pantothenic Acid (uM)") + ylab("Density") + theme_minimal() +
+    geom_vline(aes(xintercept = PA_threshold_P50), linetype = "dashed", color = "black", size = 1) + 
+    geom_vline(aes(xintercept = PA_threshold_P10), linetype = "dashed", color = "darkgray", size = 1) +
+    facet_grid(TP_label~.)
+  
+Figure6G = ggarrange(PA_dist_MISAME, PA_dist_VITAL, PA_dist_CHILD, nrow = 1, common.legend = TRUE) 
+Figure6G
+
+ggsave(paste0(fig_path, "/Figure6G.pdf"),
+         plot = Figure6G, width = 7, height = 3.5, dpi = 600)
+```
+Calculate percent of mothers with levels below PA threshold per Timepoint/BEP status:
+``` {r}
+calc_below_percentile = function (df, label) {
+  perc_10th = df %>% mutate(below_threshold = PA<PA_threshold_P10) %>% pull(below_threshold) %>% mean(na.rm = TRUE) 
+  perc_50th = df %>% mutate(below_threshold = PA<PA_threshold_P50) %>% pull(below_threshold) %>% mean(na.rm = TRUE) 
+  print(paste0(label, " Below 10th percentile: ", round(perc_10th, 4),"    Below 50th percentile: ", round(perc_50th, 4)))
+}
+
+MISAME_PA_table = Misame_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA, BEP) %>%
+  mutate(PA_threshold_P50 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "18-31 d", percentile = "P50"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50"),
+                                      Timepoint==3 ~ PA_conversion(Age_range = "3-4 m", percentile = "P50")),
+         PA_threshold_P10 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "18-31 d", percentile = "P10"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10"),
+                                      Timepoint==3 ~ PA_conversion(Age_range = "3-4 m", percentile = "P10")))
+
+VITAL_PA_table = Vital_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA, BEP) %>%
+  mutate(PA_threshold_P50 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P50")),
+         PA_threshold_P10 = case_when(Timepoint==1 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10"),
+                                      Timepoint==2 ~ PA_conversion(Age_range = "1-2 m", percentile = "P10")))
+CHILD_PA_table = Child_everything %>% filter(!is.na(Timepoint)) %>% dplyr::select(Timepoint, TP_label, PA) %>%
+  mutate(PA_threshold_P50 = PA_conversion(Age_range = "3-4 m", percentile = "P50"),
+         PA_threshold_P10 = PA_conversion(Age_range = "3-4 m", percentile = "P10"))
+
+MISAME_PA_table %>% filter(Timepoint==1) %>% filter(BEP==0) %>% calc_below_percentile("MISAME Unsupplemented, TP1:   ")
+MISAME_PA_table %>% filter(Timepoint==1) %>% filter(BEP==1) %>% calc_below_percentile("MISAME Supplemented, TP1:     ")
+MISAME_PA_table %>% filter(Timepoint==2) %>% filter(BEP==0) %>% calc_below_percentile("MISAME Unsupplemented, TP2:   ")
+MISAME_PA_table %>% filter(Timepoint==2) %>% filter(BEP==1) %>% calc_below_percentile("MISAME Supplemented, TP2:     ")
+MISAME_PA_table %>% filter(Timepoint==3) %>% filter(BEP==0) %>% calc_below_percentile("MISAME Unsupplemented, TP3:   ")
+MISAME_PA_table %>% filter(Timepoint==3) %>% filter(BEP==1) %>% calc_below_percentile("MISAME Supplemented, TP3:     ")
+VITAL_PA_table %>% filter(Timepoint==1) %>% filter(BEP==0) %>% calc_below_percentile("Mumta-LW Unsupplemented, TP1: ")
+VITAL_PA_table %>% filter(Timepoint==1) %>% filter(BEP==1) %>% calc_below_percentile("Mumta-LW Supplemented, TP1:   ")
+VITAL_PA_table %>% filter(Timepoint==2) %>% filter(BEP==0) %>% calc_below_percentile("Mumta-LW Unsupplemented, TP2: ")
+VITAL_PA_table %>% filter(Timepoint==2) %>% filter(BEP==1) %>% calc_below_percentile("Mumta-LW Supplemented, TP2:   ")
+CHILD_PA_table %>% calc_below_percentile("CHILD:                        ")
+
+```
+
+
+
+

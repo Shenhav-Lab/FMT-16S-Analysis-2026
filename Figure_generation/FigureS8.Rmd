@@ -1,0 +1,81 @@
+---
+title: "Figure S8. Biomarkers Identified in our Study Capture Tight Junction Integrity Signals in HM"
+---
+
+```{r setup, include=FALSE}
+# Show code if file is knit 
+knitr::opts_chunk$set(echo = TRUE)
+
+# Sets working directory to file location
+library(rstudioapi)
+if (interactive() && rstudioapi::isAvailable()) { 
+  rootdir = dirname(rstudioapi::getSourceEditorContext()$path) 
+  setwd(dirname(rstudioapi::getSourceEditorContext()$path)) 
+}
+```
+
+# Load data, libraries, functions
+``` {r}
+# Load libraries and data 
+source("plotting_setup.R")
+# Load functions
+source("plotting_functions.R")
+```
+
+## Figure S8
+``` {r}
+Na_K_plot_feats = list("Na_K_Ratio" = "Na:K Ratio",
+                       "Na" = "Sodium",
+                       "C2" = "Acetylcarnitine (C2)",
+                       "C3" = "Propionylcarnitine (C3)",
+                       "C4" = "Butyrylcarnitine (C4)",
+                       "C5" = "Valerylcarnitine (C5)",
+                       "Lys" = "Lysine",
+                       "Se"="Selenium",
+                       "X6.SL" = "6'-Sialyllactose")
+
+Na_K_corr_list = list("MISAME" = Misame_everything %>% 
+                        filter(Timepoint==2, 
+                               SampleID %in% rownames(misame_proteomics_filt_genes)) %>% 
+                        dplyr::select(names(Na_K_plot_feats)) %>% 
+                        as.matrix() %>% rcorr(type = "spearman"),
+                      "Mumta-LW" = Vital_everything %>% 
+                        filter(Timepoint==2, SampleID %in% rownames(vital_proteomics_filt_genes)) %>% 
+                        dplyr::select(names(Na_K_plot_feats)) %>% 
+                        as.matrix() %>% rcorr(type = "spearman"))
+Na_K_plots = list()
+Na_K_matricies = list()
+for (study in names(Na_K_corr_list)) {
+  Na_K_corr = Na_K_corr_list[[study]]
+  Na_K_corr_Rho = Na_K_corr$r[, names(Na_K_plot_feats)[c(-1, -2)]] %>% as.data.frame() %>% dplyr::slice(1:2)
+  Na_K_corr_p = Na_K_corr$P[, names(Na_K_plot_feats)[c(-1, -2)]] %>% as.data.frame() %>% dplyr::slice(1:2)
+  Na_K_matricies[[study]]  = Na_K_corr_Rho
+  Na_K_plots[[study]] = Na_K_corr_Rho %>% 
+    Heatmap(
+        cluster_rows = FALSE, cluster_columns = FALSE,  
+                col = colorRamp2(seq(-1, 1, length.out = 101), colorRampPalette(c("purple", "white", "forestgreen"))(101)),
+                name = "Rho", 
+                column_title = study, column_names_rot = -45,
+                row_labels = unlist(Na_K_plot_feats[c(1, 2)]),
+                column_labels = unlist(Na_K_plot_feats[c(-1, -2)]),
+                cell_fun = function(j, i, x, y, width, height, fill) {
+                  pval = Na_K_corr_p[i, j]
+                  if (is.na(pval)) {
+                     text_label <- "NA"
+                  } else if (pval < 0.05) {
+                    text_label <- round(Na_K_corr_Rho[i, j], 2)
+                  } else {
+                    text_label <- "ns"
+                  }
+                  grid.text(text_label, x, y, gp = gpar(fontsize = 10, col = "black"))
+                }
+      ) %>% as.ggplot()
+}
+FigureS8 = ggarrange(plotlist = Na_K_plots) 
+FigureS8 
+ggexport(filename = paste0(fig_path, "/FigureS8.pdf"), 
+         plot = FigureS8,
+        width = 8, height = 2.5)
+```
+
+

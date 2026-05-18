@@ -162,7 +162,6 @@ def plot_log_ratios(log_ratio_dict, metadata, phenotype='BEP', timepoint='Timepo
     #prepare df for plotting
     logratios_df = pd.DataFrame(log_ratio_dict)
     logratios_df = logratios_df.join(metadata)
-    #logratios_df.dropna(subset=['Secretor'], inplace=True)
     phenotype_vals = logratios_df[phenotype].unique()
     #remove nan values
     phenotype_vals = [x for x in phenotype_vals if str(x) != 'nan']

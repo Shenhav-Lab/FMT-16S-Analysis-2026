@@ -1,0 +1,245 @@
+---
+title: "Misame growth trajectory analysis"
+author: "April Jauhal"
+date: "2024-04-12"
+output: html_document
+---
+Misame growth trajectory analysis & plotting + additional metadata calculations (6 month growth/length velocities and HCAZ)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Setting to overwrite existing files within document; does not apply to gbmt RDS files which must be deleted manually to overwrite
+``` {r}
+misame_traj_overwrite=FALSE
+```
+
+Loading libraries
+``` {r}
+library(ggplot2)
+library(ggpubr)
+library(gbmt)
+library(tidyverse)
+library(zscorer)
+```
+Loading data and setting paths 
+``` {r}
+IMiC_path = "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/"
+misame_metadata <- read.delim(paste0(IMiC_path, "IMiC/Data/MISAME/metadata/MISAME_3_IMiC_analysis.csv"),
+                              sep=",")
+traj_RDS_path <- paste0(IMiC_path, "IMiC/Data/MISAME/data/RDS/") # create path before running!
+misame_traj_key_path <- paste0(IMiC_path, "IMiC/Data/MISAME/metadata/misame_processed_traj_key.csv")
+misame_traj_growth_path <- paste0(IMiC_path, "IMiC/Data/MISAME/metadata/misame_processed_traj_growth.csv")
+misame_supp_metadata_path <- paste0(IMiC_path, "IMiC/Data/MISAME/metadata/misame_metadata_supp.csv")
+fig_path <- paste0(IMiC_path, "C://Users/ETTINA03/NYU Langone Health Dropbox/April Jauhal/Shenhav_Lab/IMiC/Figures")
+```
+
+Extracting growth metric visits from first 6 months
+``` {r}
+# Excluding recall visits, AGE imputation set to 0 to remove duplicates
+misame_no_recall <- subset(subset(misame_metadata, is.na(VISIT_R_FL)), AGEIMPFL==0)
+misame_growth_visits <-  c("Delivery", "Post Natal FU M01", "Post Natal FU M02", "Post Natal FU M03", "Post Natal FU M04", "Post Natal FU M05", "Post Natal FU M06")
+misame_growth_df <- subset(misame_no_recall, VISIT %in% misame_growth_visits)
+```
+Defining functions
+``` {r}
+run_gbmt <- function (ngroups, dim, metric, df) {
+  # inputs num groups, dimensions, metric (eg. "WAZ"), and df (likely growth_df)
+  # returns gbmt results object, either runs or recovers from RDS file
+  # Assumes "traj_RDS_path" defined at the top of the script contains the RDS folders
+  # No scaling procedure is run (which makes sense if using z-scores as inputs)
+  RDS_name=paste0("m", ngroups, "_", dim, ".RDS")
+  WAZ_RDS_path <- paste0(gsub("/$", "", traj_RDS_path), "/", metric, "/")
+  rdsfile=paste0(WAZ_RDS_path, RDS_name)
+  if (file.exists(dirname(rdsfile))) {
+    if (!file.exists(rdsfile)) {
+      gbmt_res <- gbmt(x.names=metric, unit="SUBJIDO", time="AGEDAYS", d=dim, ng=ngroups, data=df, scaling=0)
+      saveRDS(gbmt_res, rdsfile)
+      print("new save file written")
+    } else {print("save file exists")}
+    return(readRDS(rdsfile))
+  } else {print(paste0("ERROR: check/create filepath: ", dirname(file)))}
+}
+
+bic_calculate <- function(model_val, df) {
+  return(-2*model_val$logLik+model_val$npar*log(nrow(df)))
+}
+
+bic_compare <- function(bic_list) {
+  # Takes a list input (names=varname, value=value) of BIC values, tests based on < -2 BIC diff threshold
+  # Performs pairwise comparisons and returns the single best BIC as a named list
+  print("always double check that list components are increasing in complexity")
+  diff_vector <- c(names(bic_list)[1])
+  for (n in 1:(length(bic_list)-1)) {
+    diff <- as.numeric(bic_list[[(n+1)]]) - as.numeric(bic_list[[n]])
+    print(paste0(names(bic_list)[(n+1)], "-", names(bic_list)[(n)], ": ", diff))
+    if (diff < -2) {
+      diff_vector[length(diff_vector)+1] <- names(bic_list)[n+1]
+    }
+  }
+  retval <- list(bic_list[[length(diff_vector)]])
+  names(retval) <- names(bic_list)[length(diff_vector)]
+  print(paste0("best model: ", names(retval)))
+  return(retval)
+}
+```
+# Trajectory calculation for WAZ
+Group based trajectory modeling
+``` {r Calculating WAZ trajectories}
+
+# Dimension 1
+WAZm1_1 <- run_gbmt(ngroups=1, dim=1, metric="WAZ", df=misame_growth_df)
+WAZm2_1 <- run_gbmt(ngroups=2, dim=1, metric="WAZ", df=misame_growth_df)
+WAZm3_1 <- run_gbmt(ngroups=3, dim=1, metric="WAZ", df=misame_growth_df)
+WAZm4_1 <- run_gbmt(ngroups=4, dim=1, metric="WAZ", df=misame_growth_df)
+WAZm5_1 <- run_gbmt(ngroups=5, dim=1, metric="WAZ", df=misame_growth_df)
+WAZm6_1 <- run_gbmt(ngroups=6, dim=1, metric="WAZ", df=misame_growth_df)
+
+# Dimension 2
+WAZm1_2 <- run_gbmt(ngroups=1, dim=2, metric="WAZ", df=misame_growth_df)
+WAZm2_2 <- run_gbmt(ngroups=2, dim=2, metric="WAZ", df=misame_growth_df)
+WAZm3_2 <- run_gbmt(ngroups=3, dim=2, metric="WAZ", df=misame_growth_df)
+WAZm4_2 <- run_gbmt(ngroups=4, dim=2, metric="WAZ", df=misame_growth_df)
+WAZm5_2 <- run_gbmt(ngroups=5, dim=2, metric="WAZ", df=misame_growth_df)
+WAZm6_2 <- run_gbmt(ngroups=6, dim=2, metric="WAZ", df=misame_growth_df)
+
+# Dimension 3
+WAZm1_3 <- run_gbmt(ngroups=1, dim=3, metric="WAZ", df=misame_growth_df)
+WAZm2_3 <- run_gbmt(ngroups=2, dim=3, metric="WAZ", df=misame_growth_df)
+WAZm3_3 <- run_gbmt(ngroups=3, dim=3, metric="WAZ", df=misame_growth_df)
+WAZm4_3 <- run_gbmt(ngroups=4, dim=3, metric="WAZ", df=misame_growth_df)
+WAZm5_3 <- run_gbmt(ngroups=5, dim=3, metric="WAZ", df=misame_growth_df)
+WAZm6_3 <- run_gbmt(ngroups=6, dim=3, metric="WAZ", df=misame_growth_df)
+
+# Dimension 4
+WAZm1_4 <- run_gbmt(ngroups=1, dim=4, metric="WAZ", df=misame_growth_df)
+WAZm2_4 <- run_gbmt(ngroups=2, dim=4, metric="WAZ", df=misame_growth_df)
+WAZm3_4 <- run_gbmt(ngroups=3, dim=4, metric="WAZ", df=misame_growth_df)
+WAZm4_4 <- run_gbmt(ngroups=4, dim=4, metric="WAZ", df=misame_growth_df)
+WAZm5_4 <- run_gbmt(ngroups=5, dim=4, metric="WAZ", df=misame_growth_df)
+WAZm6_4 <- run_gbmt(ngroups=6, dim=4, metric="WAZ", df=misame_growth_df)
+
+# Dimension 5
+WAZm1_5 <- run_gbmt(ngroups=1, dim=5, metric="WAZ", df=misame_growth_df)
+WAZm2_5 <- run_gbmt(ngroups=2, dim=5, metric="WAZ", df=misame_growth_df)
+WAZm3_5 <- run_gbmt(ngroups=3, dim=5, metric="WAZ", df=misame_growth_df)
+WAZm4_5 <- run_gbmt(ngroups=4, dim=5, metric="WAZ", df=misame_growth_df)
+WAZm5_5 <- run_gbmt(ngroups=5, dim=5, metric="WAZ", df=misame_growth_df)
+WAZm6_5 <- run_gbmt(ngroups=6, dim=5, metric="WAZ", df=misame_growth_df)
+
+```
+Comparing 1 dimensional models
+``` {r}
+WAZ_dim1_best <- bic_compare(list(WAZ_BIC_1_1=bic_calculate(WAZm1_1, misame_growth_df), 
+                                  WAZ_BIC_2_1=bic_calculate(WAZm2_1, misame_growth_df), 
+                                  WAZ_BIC_3_1=bic_calculate(WAZm3_1, misame_growth_df), 
+                                  WAZ_BIC_4_1=bic_calculate(WAZm4_1, misame_growth_df), 
+                                  WAZ_BIC_5_1=bic_calculate(WAZm5_1, misame_growth_df), 
+                                  WAZ_BIC_6_1=bic_calculate(WAZm6_1, misame_growth_df)))
+
+print(WAZ_dim1_best)
+```
+Comparing 2 dimensional models
+```{r}
+WAZ_dim2_best <- bic_compare(list(WAZ_BIC_1_2=bic_calculate(WAZm1_2, misame_growth_df), 
+                                  WAZ_BIC_2_2=bic_calculate(WAZm2_2, misame_growth_df), 
+                                  WAZ_BIC_3_2=bic_calculate(WAZm3_2, misame_growth_df), 
+                                  WAZ_BIC_4_2=bic_calculate(WAZm4_2, misame_growth_df), 
+                                  WAZ_BIC_5_2=bic_calculate(WAZm5_2, misame_growth_df), 
+                                  WAZ_BIC_6_2=bic_calculate(WAZm6_2, misame_growth_df)))
+print(WAZ_dim2_best)
+```
+Comparing 3 dimensional models
+```{r}
+WAZ_dim3_best <- bic_compare(list(WAZ_BIC_1_3=bic_calculate(WAZm1_3, misame_growth_df), 
+                                  WAZ_BIC_2_3=bic_calculate(WAZm2_3, misame_growth_df), 
+                                  WAZ_BIC_3_3=bic_calculate(WAZm3_3, misame_growth_df), 
+                                  WAZ_BIC_4_3=bic_calculate(WAZm4_3, misame_growth_df), 
+                                  WAZ_BIC_5_3=bic_calculate(WAZm5_3, misame_growth_df), 
+                                  WAZ_BIC_6_3=bic_calculate(WAZm6_3, misame_growth_df)))
+print(WAZ_dim3_best) 
+```
+Comparing 4 dimensional models
+``` {r}
+WAZ_dim4_best <- bic_compare(list(WAZ_BIC_1_4=bic_calculate(WAZm1_4, misame_growth_df), 
+                                  WAZ_BIC_2_4=bic_calculate(WAZm2_4, misame_growth_df), 
+                                  WAZ_BIC_3_4=bic_calculate(WAZm3_4, misame_growth_df), 
+                                  WAZ_BIC_4_4=bic_calculate(WAZm4_4, misame_growth_df), 
+                                  WAZ_BIC_5_4=bic_calculate(WAZm5_4, misame_growth_df), 
+                                  WAZ_BIC_6_4=bic_calculate(WAZm6_4, misame_growth_df)))
+print(WAZ_dim4_best) 
+```
+Comparing 5 dimensional models
+``` {r}
+WAZ_dim5_best <- bic_compare(list(WAZ_BIC_1_5=bic_calculate(WAZm1_5, misame_growth_df), 
+                                  WAZ_BIC_2_5=bic_calculate(WAZm2_5, misame_growth_df), 
+                                  WAZ_BIC_3_5=bic_calculate(WAZm3_5, misame_growth_df), 
+                                  WAZ_BIC_4_5=bic_calculate(WAZm4_5, misame_growth_df), 
+                                  WAZ_BIC_5_5=bic_calculate(WAZm5_5, misame_growth_df), 
+                                  WAZ_BIC_6_5=bic_calculate(WAZm6_5, misame_growth_df)))
+print(WAZ_dim5_best) 
+```
+Comparing best models from each dimension
+``` {r}
+bic_compare(c(WAZ_dim1_best, WAZ_dim2_best, WAZ_dim3_best, WAZ_dim4_best, WAZ_dim5_best))
+
+# The 5-dimensional model provided the most biologically coherent stratification of longitudinal growth trajectories
+WAZ_best_model <- WAZ_dim5_best
+WAZ_group_list <- get(str_replace(names(WAZ_best_model), "_BIC_", "m"))$assign.list
+
+WAZ_group_assignment <- vector()
+for (each_infant in misame_growth_df$SUBJIDO){
+  for (WAZ_group_num in names(WAZ_group_list)) {
+    if (each_infant %in% WAZ_group_list[[WAZ_group_num]]) {
+      WAZ_group_assignment <- c(WAZ_group_assignment, WAZ_group_num)
+    }
+  }
+}
+misame_growth_df$WAZ_traj <- as.factor(WAZ_group_assignment)
+```
+Adding labels
+``` {r}
+misame_growth_df2 = misame_growth_df %>%
+         filter(SUBJID!=1828) %>%  # outlier infant (WAZ values below -6 and continuously trending down)
+         mutate(Month=AGEDAYS/30, 
+                WAZ_traj_cat = ifelse(WAZ_traj==1, "Stable3",
+                                      ifelse(WAZ_traj==2, "Stable2",
+                                             ifelse(WAZ_traj==3, "Recovered",
+                                                    ifelse(WAZ_traj==4, "Stable4",
+                                                           ifelse(WAZ_traj==5, "Unrecovered", "Stable1"))))),
+                WAZ_traj_cat = factor(WAZ_traj_cat, levels = c("Stable1", "Stable2", "Stable3", "Stable4", "Recovered", "Unrecovered")))
+```
+
+Save results as a key for future analysis 
+``` {r}
+misame_traj_key = misame_growth_df2 %>% dplyr::rename(SubjectID=SUBJID) %>% dplyr::select(SubjectID, WAZ_traj, WAZ_traj_cat) %>% unique() 
+if (misame_traj_overwrite | !file.exists(misame_traj_key_path)) {
+  write.csv(misame_traj_key, file=misame_traj_key_path)
+}
+
+if (misame_traj_overwrite | !file.exists(misame_traj_growth_path)) {
+  write.csv(misame_growth_df2, file=misame_traj_growth_path)
+}
+```
+# Additional metadata calcuations
+Building supplementary metadata
+``` {r}
+weight_diff_df <- left_join(misame_metadata, inner_join(
+  misame_metadata %>% filter(VISIT=="Delivery", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG) %>% dplyr::rename(wt_0=WTKG),
+  misame_metadata %>% filter(VISIT=="Post Natal FU M06", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, WTKG, AGEDAYS) %>% dplyr::rename(wt_6=WTKG, AGE=AGEDAYS))) %>%
+    mutate(delta_weight_6mo = wt_6-wt_0,
+           growth_vel_6mo=(1000*log(wt_6/wt_0))/AGE) # Patel exponential method
+
+length_diff_df <- left_join(misame_metadata, inner_join(
+  misame_metadata %>% filter(VISIT=="Delivery", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM) %>% dplyr::rename(len_0=LENCM),
+  misame_metadata %>% filter(VISIT=="Post Natal FU M06", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJID, LENCM, AGEDAYS) %>% dplyr::rename(len_6=LENCM, AGE=AGEDAYS))) %>%
+    mutate(delta_length_6mo = len_6-len_0,   
+           length_vel_6mo=delta_length_6mo/(AGE/30.437))
+
+hcaz_df = addWGSR(misame_metadata, sex= "SEXN", firstPart = "HCIRCM", secondPart = "AGEDAYS", index = "hca") %>% filter(VISIT=="Post Natal FU M04", is.na(VISIT_R_FL)) %>% dplyr::select(SUBJIDO, hcaz) %>% dplyr::rename(HCAZ_M04 = hcaz) %>% unique()
+
+if (misame_traj_overwrite | !file.exists(misame_supp_metadata_path)) {
+  write.csv(weight_diff_df %>% select(SUBJIDO, growth_vel_6mo) %>% full_join(length_diff_df %>% select(SUBJIDO, length_vel_6mo)) %>% full_join(hcaz_df) %>% unique(), misame_supp_metadata_path)
+}
+```
+
